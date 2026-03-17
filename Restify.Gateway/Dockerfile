@@ -1,18 +1,25 @@
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview AS base
-WORKDIR /app
-EXPOSE 8080
-
+# Gateway Service Dockerfile
+# Build context: repo root (BackEnd/)
 FROM mcr.microsoft.com/dotnet/sdk:10.0-preview AS build
 WORKDIR /src
-COPY ["Restify.Gateway.csproj", "."]
-RUN dotnet restore
-COPY . .
-RUN dotnet build -c Release -o /app/build
 
-FROM build AS publish
-RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false
+# Copy project file
+COPY ["Restify.Gateway/Restify.Gateway.csproj", "Restify.Gateway/"]
 
-FROM base AS final
+# Restore dependencies
+RUN dotnet restore "Restify.Gateway/Restify.Gateway.csproj"
+
+# Copy remaining files
+COPY Restify.Gateway/ Restify.Gateway/
+
+# Publish
+RUN dotnet publish "Restify.Gateway/Restify.Gateway.csproj" -c Release -o /app/publish /p:UseAppHost=false
+
+# Final stage
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview AS runtime
 WORKDIR /app
-COPY --from=publish /app/publish .
+COPY --from=build /app/publish .
+
+EXPOSE 8080
+
 ENTRYPOINT ["dotnet", "Restify.Gateway.dll"]

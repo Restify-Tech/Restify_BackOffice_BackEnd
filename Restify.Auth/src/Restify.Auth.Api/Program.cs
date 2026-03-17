@@ -85,11 +85,12 @@ if (app.Environment.IsDevelopment())
 }
 
 // Configurar middleware
-if (app.Environment.IsDevelopment())
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Restify Auth API v1");
+    c.RoutePrefix = string.Empty;
+});
 
 app.UseSerilogRequestLogging();
 
