@@ -16,7 +16,15 @@ jobs:
       packages: write
     strategy:
       matrix:
-        service: [Restify.Auth, Restify.Core, Restify.BackOffice, Restify.Gateway]
+        include:
+          - service: Restify.Auth
+            image: restify-auth
+          - service: Restify.Core
+            image: restify-core
+          - service: Restify.BackOffice
+            image: restify-backoffice
+          - service: Restify.Gateway
+            image: restify-gateway
     steps:
       - uses: actions/checkout@v4
 
@@ -31,4 +39,4 @@ jobs:
           context: .
           file: ./${{ matrix.service }}/Dockerfile
           push: true
-          tags: ghcr.io/restify-tech/restify-backoffice-backend/${{ matrix.service }}:dev
+          tags: ghcr.io/restify-tech/${{ matrix.image }}:dev
