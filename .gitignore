@@ -1,0 +1,22 @@
+# Build results
+bin/
+obj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.cache
+
+# Rider
+.idea/
+
+# User-specific settings
+appsettings.Development.json
+
+# Node modules
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db

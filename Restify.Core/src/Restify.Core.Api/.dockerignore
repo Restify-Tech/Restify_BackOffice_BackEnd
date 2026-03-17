@@ -1,0 +1,15 @@
+# .dockerignore for Core Service
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.vscode/
+*.log
+appsettings.Development.json
+appsettings.Local.json
+.idea/
+*.md
+tests/
+**/tests/
+**/*.Tests/

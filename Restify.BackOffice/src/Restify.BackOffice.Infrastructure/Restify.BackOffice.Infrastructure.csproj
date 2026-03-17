@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Restify.BackOffice.Infrastructure</RootNamespace>
+    <AssemblyName>Restify.BackOffice.Infrastructure</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Restify.BackOffice.Application\Restify.BackOffice.Application.csproj" />
+    <ProjectReference Include="..\..\..\Restify.Core\src\Restify.Core.Infrastructure\Restify.Core.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.1" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
+    <PackageReference Include="QuestPDF" Version="2025.4.0" />
+    <PackageReference Include="MassTransit.RabbitMQ" Version="8.4.0" />
+  </ItemGroup>
+
+</Project>

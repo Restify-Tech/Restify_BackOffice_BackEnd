@@ -1,0 +1,417 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Restaurant.BackOffice.Application.DTOs.Reports;
+using Restaurant.BackOffice.Application.Interfaces;
+using Restaurant.BackOffice.Domain.Enums;
+using Restaurant.Core.Application.DTOs.Common;
+using Restaurant.Core.Application.Interfaces;
+
+namespace Restaurant.BackOffice.Api.Controllers;
+
+[ApiController]
+[Route("api/backoffice/[controller]")]
+[Authorize]
+public class ReportsController : ControllerBase
+{
+    private readonly IReportService _reportService;
+    private readonly ICurrentUserService _currentUserService;
+    private readonly ILogger<ReportsController> _logger;
+
+    public ReportsController(
+        IReportService reportService,
+        ICurrentUserService currentUserService,
+        ILogger<ReportsController> logger)
+    {
+        _reportService = reportService;
+        _currentUserService = currentUserService;
+        _logger = logger;
+    }
+
+    // ========== SALES REPORTS ==========
+
+    /// <summary>
+    /// GET /api/backoffice/reports/sales/summary?from=2026-01-01&to=2026-01-31
+    /// </summary>
+    [HttpGet("sales/summary")]
+    public async Task<ActionResult<Result<SalesSummaryDto>>> GetSalesSummary(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var tenantId = _currentUserService.TenantId;
+            var result = await _reportService.GetSalesSummaryAsync(from, to, tenantId, cancellationToken);
+            return Ok(Result<SalesSummaryDto>.Success(result));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting sales summary");
+            return BadRequest(Result<SalesSummaryDto>.Failure("Error al obtener resumen de ventas"));
+        }
+    }
+
+    /// <summary>
+    /// GET /api/backoffice/reports/sales/comparative?periodType=Today
+    /// </summary>
+    [HttpGet("sales/comparative")]
+    public async Task<ActionResult<Result<ComparativeSalesReportDto>>> GetComparativeSales(
+        [FromQuery] PeriodType periodType,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var tenantId = _currentUserService.TenantId;
+            var result = await _reportService.GetComparativeSalesAsync(periodType, tenantId, cancellationToken);
+            return Ok(Result<ComparativeSalesReportDto>.Success(result));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting comparative sales");
+            return BadRequest(Result<ComparativeSalesReportDto>.Failure("Error al obtener comparativa de ventas"));
+        }
+    }
+
+    /// <summary>
+    /// GET /api/backoffice/reports/sales/by-payment-method?from=...&to=...
+    /// </summary>
+    [HttpGet("sales/by-payment-method")]
+    public async Task<ActionResult<Result<List<SalesByPaymentMethodDto>>>> GetSalesByPaymentMethod(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var tenantId = _currentUserService.TenantId;
+            var result = await _reportService.GetSalesByPaymentMethodAsync(from, to, tenantId, cancellationToken);
+            return Ok(Result<List<SalesByPaymentMethodDto>>.Success(result));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting sales by payment method");
+            return BadRequest(Result<List<SalesByPaymentMethodDto>>.Failure("Error al obtener ventas por método de pago"));
+        }
+    }
+
+    /// <summary>
+    /// GET /api/backoffice/reports/sales/by-timeslot?from=...&to=...
+    /// </summary>
+    [HttpGet("sales/by-timeslot")]
+    public async Task<ActionResult<Result<List<SalesByTimeSlotDto>>>> GetSalesByTimeSlot(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var tenantId = _currentUserService.TenantId;
+            var result = await _reportService.GetSalesByTimeSlotAsync(from, to, tenantId, cancellationToken);
+            return Ok(Result<List<SalesByTimeSlotDto>>.Success(result));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting sales by timeslot");
+            return BadRequest(Result<List<SalesByTimeSlotDto>>.Failure("Error al obtener ventas por franja horaria"));
+        }
+    }
+
+    /// <summary>
+    /// GET /api/backoffice/reports/sales/peak-hours?from=...&to=...
+    /// </summary>
+    [HttpGet("sales/peak-hours")]
+    public async Task<ActionResult<Result<List<PeakHoursDto>>>> GetPeakHours(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var tenantId = _currentUserService.TenantId;
+            var result = await _reportService.GetPeakHoursAsync(from, to, tenantId, cancellationToken);
+            return Ok(Result<List<PeakHoursDto>>.Success(result));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting peak hours");
+            return BadRequest(Result<List<PeakHoursDto>>.Failure("Error al obtener horas pico"));
+        }
+    }
+
+    // ========== PRODUCT REPORTS ==========
+
+    /// <summary>
+    /// GET /api/backoffice/reports/products/top-selling?from=...&to=...&limit=10
+    /// </summary>
+    [HttpGet("products/top-selling")]
+    public async Task<ActionResult<Result<List<TopSellingProductDto>>>> GetTopSellingProducts(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        [FromQuery] int limit = 10,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var tenantId = _currentUserService.TenantId;
+            var result = await _reportService.GetTopSellingProductsAsync(from, to, limit, tenantId, cancellationToken);
+            return Ok(Result<List<TopSellingProductDto>>.Success(result));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting top selling products");
+            return BadRequest(Result<List<TopSellingProductDto>>.Failure("Error al obtener productos más vendidos"));
+        }
+    }
+
+    /// <summary>
+    /// GET /api/backoffice/reports/products/abc-analysis?from=...&to=...
+    /// </summary>
+    [HttpGet("products/abc-analysis")]
+    public async Task<ActionResult<Result<AbcAnalysisSummaryDto>>> GetProductAbcAnalysis(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var tenantId = _currentUserService.TenantId;
+            var result = await _reportService.GetProductAbcAnalysisAsync(from, to, tenantId, cancellationToken);
+            return Ok(Result<AbcAnalysisSummaryDto>.Success(result));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting ABC analysis");
+            return BadRequest(Result<AbcAnalysisSummaryDto>.Failure("Error al obtener análisis ABC"));
+        }
+    }
+
+    /// <summary>
+    /// GET /api/backoffice/reports/products/low-movement?from=...&to=...&threshold=5
+    /// </summary>
+    [HttpGet("products/low-movement")]
+    public async Task<ActionResult<Result<List<LowMovementProductDto>>>> GetLowMovementProducts(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        [FromQuery] int threshold = 5,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var tenantId = _currentUserService.TenantId;
+            var result = await _reportService.GetLowMovementProductsAsync(from, to, threshold, tenantId, cancellationToken);
+            return Ok(Result<List<LowMovementProductDto>>.Success(result));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting low movement products");
+            return BadRequest(Result<List<LowMovementProductDto>>.Failure("Error al obtener productos de bajo movimiento"));
+        }
+    }
+
+    /// <summary>
+    /// GET /api/backoffice/reports/products/by-category?from=...&to=...
+    /// </summary>
+    [HttpGet("products/by-category")]
+    public async Task<ActionResult<Result<List<CategoryPerformanceDto>>>> GetCategoryPerformance(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var tenantId = _currentUserService.TenantId;
+            var result = await _reportService.GetCategoryPerformanceAsync(from, to, tenantId, cancellationToken);
+            return Ok(Result<List<CategoryPerformanceDto>>.Success(result));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting category performance");
+            return BadRequest(Result<List<CategoryPerformanceDto>>.Failure("Error al obtener rendimiento por categoría"));
+        }
+    }
+
+    /// <summary>
+    /// GET /api/backoffice/reports/products/popular-modifiers?from=...&to=...&limit=10
+    /// </summary>
+    [HttpGet("products/popular-modifiers")]
+    public async Task<ActionResult<Result<List<PopularModifierDto>>>> GetPopularModifiers(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        [FromQuery] int limit = 10,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var tenantId = _currentUserService.TenantId;
+            var result = await _reportService.GetPopularModifiersAsync(from, to, limit, tenantId, cancellationToken);
+            return Ok(Result<List<PopularModifierDto>>.Success(result));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting popular modifiers");
+            return BadRequest(Result<List<PopularModifierDto>>.Failure("Error al obtener modificadores populares"));
+        }
+    }
+
+    // ========== EMPLOYEE REPORTS ==========
+
+    /// <summary>
+    /// GET /api/backoffice/reports/employees/performance?from=...&to=...
+    /// </summary>
+    [HttpGet("employees/performance")]
+    public async Task<ActionResult<Result<List<EmployeePerformanceDto>>>> GetEmployeePerformance(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var tenantId = _currentUserService.TenantId;
+            var result = await _reportService.GetEmployeePerformanceAsync(from, to, tenantId, cancellationToken);
+            return Ok(Result<List<EmployeePerformanceDto>>.Success(result));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting employee performance");
+            return BadRequest(Result<List<EmployeePerformanceDto>>.Failure("Error al obtener rendimiento de empleados"));
+        }
+    }
+
+    /// <summary>
+    /// GET /api/backoffice/reports/employees/top-performer?from=...&to=...
+    /// </summary>
+    [HttpGet("employees/top-performer")]
+    public async Task<ActionResult<Result<TopPerformerDto>>> GetTopPerformer(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var tenantId = _currentUserService.TenantId;
+            var result = await _reportService.GetTopPerformerAsync(from, to, tenantId, cancellationToken);
+            
+            if (result == null)
+                return Ok(Result<TopPerformerDto>.Failure("No hay datos de rendimiento en el período seleccionado"));
+            
+            return Ok(Result<TopPerformerDto>.Success(result));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting top performer");
+            return BadRequest(Result<TopPerformerDto>.Failure("Error al obtener mejor empleado"));
+        }
+    }
+
+    /// <summary>
+    /// GET /api/backoffice/reports/employees/errors?from=...&to=...
+    /// </summary>
+    [HttpGet("employees/errors")]
+    public async Task<ActionResult<Result<List<EmployeeErrorsDto>>>> GetEmployeeErrors(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var tenantId = _currentUserService.TenantId;
+            var result = await _reportService.GetEmployeeErrorsAsync(from, to, tenantId, cancellationToken);
+            return Ok(Result<List<EmployeeErrorsDto>>.Success(result));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting employee errors");
+            return BadRequest(Result<List<EmployeeErrorsDto>>.Failure("Error al obtener errores de empleados"));
+        }
+    }
+
+    // ========== DASHBOARD ==========
+
+    /// <summary>
+    /// GET /api/backoffice/reports/dashboard/kpis
+    /// </summary>
+    [HttpGet("dashboard/kpis")]
+    public async Task<ActionResult<Result<DashboardKpisDto>>> GetDashboardKpis(
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var tenantId = _currentUserService.TenantId;
+            var result = await _reportService.GetDashboardKpisAsync(tenantId, cancellationToken);
+            return Ok(Result<DashboardKpisDto>.Success(result));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting dashboard KPIs");
+            return BadRequest(Result<DashboardKpisDto>.Failure("Error al obtener KPIs del dashboard"));
+        }
+    }
+
+    // ========== CONTROL REPORTS ==========
+
+    /// <summary>
+    /// GET /api/backoffice/reports/invoices/cancelled?from=...&to=...
+    /// </summary>
+    [HttpGet("invoices/cancelled")]
+    public async Task<ActionResult<Result<List<CancelledInvoicesReportDto>>>> GetCancelledInvoices(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var tenantId = _currentUserService.TenantId;
+            var result = await _reportService.GetCancelledInvoicesAsync(from, to, tenantId, cancellationToken);
+            return Ok(Result<List<CancelledInvoicesReportDto>>.Success(result));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting cancelled invoices");
+            return BadRequest(Result<List<CancelledInvoicesReportDto>>.Failure("Error al obtener facturas canceladas"));
+        }
+    }
+
+    /// <summary>
+    /// GET /api/backoffice/reports/invoices/discounts?from=...&to=...
+    /// </summary>
+    [HttpGet("invoices/discounts")]
+    public async Task<ActionResult<Result<List<DiscountsReportDto>>>> GetDiscounts(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var tenantId = _currentUserService.TenantId;
+            var result = await _reportService.GetDiscountsReportAsync(from, to, tenantId, cancellationToken);
+            return Ok(Result<List<DiscountsReportDto>>.Success(result));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting discounts");
+            return BadRequest(Result<List<DiscountsReportDto>>.Failure("Error al obtener descuentos"));
+        }
+    }
+
+    /// <summary>
+    /// GET /api/backoffice/reports/invoices/discounts-summary?from=...&to=...
+    /// </summary>
+    [HttpGet("invoices/discounts-summary")]
+    public async Task<ActionResult<Result<DiscountsSummaryDto>>> GetDiscountsSummary(
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var tenantId = _currentUserService.TenantId;
+            var result = await _reportService.GetDiscountsSummaryAsync(from, to, tenantId, cancellationToken);
+            return Ok(Result<DiscountsSummaryDto>.Success(result));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting discounts summary");
+            return BadRequest(Result<DiscountsSummaryDto>.Failure("Error al obtener resumen de descuentos"));
+        }
+    }
+}

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Restify.BackOffice.Domain</RootNamespace>
+    <AssemblyName>Restify.BackOffice.Domain</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Restify.Core\src\Restify.Core.Domain\Restify.Core.Domain.csproj" />
+  </ItemGroup>
+
+</Project>
