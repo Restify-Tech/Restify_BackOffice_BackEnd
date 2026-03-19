@@ -12,8 +12,8 @@ using Restify.BackOffice.Infrastructure.Persistence;
 namespace Restify.BackOffice.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(BackOfficeDbContext))]
-    [Migration("20260312171123_AddElectronicInvoicing")]
-    partial class AddElectronicInvoicing
+    [Migration("20260319201609_PendingChanges_")]
+    partial class PendingChanges_
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -3131,6 +3131,64 @@ namespace Restify.BackOffice.Infrastructure.Persistence.Migrations
                     b.ToTable("Tables", "backoffice");
                 });
 
+            modelBuilder.Entity("Restify.BackOffice.Domain.Entities.TransferPaymentRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("BankReference")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ImageUrl")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PayerIdentification")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PayerName")
+                        .HasColumnType("text");
+
+                    b.Property<string>("RejectionReason")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReviewedBy")
+                        .HasColumnType("text");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId");
+
+                    b.ToTable("TransferPaymentRequests", "backoffice");
+                });
+
             modelBuilder.Entity("Restify.BackOffice.Domain.Entities.WithholdingDetail", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3709,6 +3767,17 @@ namespace Restify.BackOffice.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Table");
+                });
+
+            modelBuilder.Entity("Restify.BackOffice.Domain.Entities.TransferPaymentRequest", b =>
+                {
+                    b.HasOne("Restify.BackOffice.Domain.Entities.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Order");
                 });
 
             modelBuilder.Entity("Restify.BackOffice.Domain.Entities.WithholdingDetail", b =>
