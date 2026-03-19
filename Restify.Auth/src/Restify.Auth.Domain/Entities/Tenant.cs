@@ -131,6 +131,43 @@ public class Tenant : AuditableEntity
     /// </summary>
     public bool OnboardingCompleted { get; set; }
 
+    // --- Branding & Templates ---
+
+    /// <summary>
+    /// URL del favicon del restaurante
+    /// </summary>
+    public string? FaviconUrl { get; set; }
+
+    /// <summary>
+    /// Color de acento de la marca (hex)
+    /// </summary>
+    public string AccentColor { get; set; } = "#F59E0B";
+
+    /// <summary>
+    /// Nombre del template visual seleccionado
+    /// </summary>
+    public string TemplateName { get; set; } = "elegante";
+
+    /// <summary>
+    /// CSS personalizado del tenant (opcional)
+    /// </summary>
+    public string? CustomCss { get; set; }
+
+    /// <summary>
+    /// URL de la imagen de portada del restaurante
+    /// </summary>
+    public string? CoverImageUrl { get; set; }
+
+    /// <summary>
+    /// Fuente para encabezados (Google Fonts)
+    /// </summary>
+    public string? FontHeading { get; set; }
+
+    /// <summary>
+    /// Fuente para texto del cuerpo (Google Fonts)
+    /// </summary>
+    public string? FontBody { get; set; }
+
     // Navegación
     public virtual ICollection<User> Users { get; set; } = new List<User>();
     public virtual ICollection<Role> Roles { get; set; } = new List<Role>();

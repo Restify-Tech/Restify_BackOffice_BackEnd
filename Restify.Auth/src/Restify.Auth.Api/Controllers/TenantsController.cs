@@ -95,4 +95,89 @@ public class TenantsController : ControllerBase
 
         return NoContent();
     }
+
+    /// <summary>
+    /// Obtener branding publico por slug (para menu QR)
+    /// </summary>
+    [AllowAnonymous]
+    [HttpGet("branding/{slug}")]
+    public async Task<IActionResult> GetBrandingBySlug(string slug, CancellationToken cancellationToken)
+    {
+        var result = await _service.GetBrandingBySlugAsync(slug, cancellationToken);
+
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
+
+        return Ok(result.Data);
+    }
+
+    /// <summary>
+    /// Obtener branding del tenant por ID (admin)
+    /// </summary>
+    [HttpGet("{id:guid}/branding")]
+    public async Task<IActionResult> GetBrandingById(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _service.GetBrandingByIdAsync(id, cancellationToken);
+
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
+
+        return Ok(result.Data);
+    }
+
+    /// <summary>
+    /// Actualizar branding del tenant
+    /// </summary>
+    [HttpPut("{id:guid}/branding")]
+    public async Task<IActionResult> UpdateBranding(Guid id, [FromBody] UpdateTenantBrandingRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _service.UpdateBrandingAsync(id, request, cancellationToken);
+
+        if (!result.IsSuccess)
+            return result.Error?.Contains("no encontrad") == true
+                ? NotFound(new { error = result.Error })
+                : BadRequest(new { error = result.Error });
+
+        return Ok(result.Data);
+    }
+
+    /// <summary>
+    /// Subir logo del tenant
+    /// </summary>
+    [HttpPost("{id:guid}/logo")]
+    public async Task<IActionResult> UploadLogo(Guid id, IFormFile file, CancellationToken cancellationToken)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest(new { error = "Debe seleccionar un archivo" });
+
+        using var stream = file.OpenReadStream();
+        var result = await _service.UploadLogoAsync(id, stream, file.FileName, cancellationToken);
+
+        if (!result.IsSuccess)
+            return result.Error?.Contains("no encontrad") == true
+                ? NotFound(new { error = result.Error })
+                : BadRequest(new { error = result.Error });
+
+        return Ok(new { url = result.Data });
+    }
+
+    /// <summary>
+    /// Subir imagen de portada del tenant
+    /// </summary>
+    [HttpPost("{id:guid}/cover-image")]
+    public async Task<IActionResult> UploadCoverImage(Guid id, IFormFile file, CancellationToken cancellationToken)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest(new { error = "Debe seleccionar un archivo" });
+
+        using var stream = file.OpenReadStream();
+        var result = await _service.UploadCoverImageAsync(id, stream, file.FileName, cancellationToken);
+
+        if (!result.IsSuccess)
+            return result.Error?.Contains("no encontrad") == true
+                ? NotFound(new { error = result.Error })
+                : BadRequest(new { error = result.Error });
+
+        return Ok(new { url = result.Data });
+    }
 }

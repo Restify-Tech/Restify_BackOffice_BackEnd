@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Restify.Auth.Application.DTOs.Common;
 using Restify.Auth.Application.DTOs.Tenant;
 using Restify.Auth.Application.Interfaces;
+using Restify.Auth.Domain.Entities;
 using Restify.Auth.Infrastructure.Persistence;
 
 namespace Restify.Auth.Infrastructure.Services;
@@ -9,10 +11,14 @@ namespace Restify.Auth.Infrastructure.Services;
 public class TenantManagementService : ITenantManagementService
 {
     private readonly AppDbContext _context;
+    private readonly IFileStorageService _fileStorage;
+    private readonly ILogger<TenantManagementService> _logger;
 
-    public TenantManagementService(AppDbContext context)
+    public TenantManagementService(AppDbContext context, IFileStorageService fileStorage, ILogger<TenantManagementService> logger)
     {
         _context = context;
+        _fileStorage = fileStorage;
+        _logger = logger;
     }
 
     public async Task<Result<PagedResponse<TenantListDto>>> GetAllAsync(PagedRequest request, CancellationToken cancellationToken = default)
@@ -65,18 +71,7 @@ public class TenantManagementService : ITenantManagementService
         if (tenant == null)
             return Result<TenantDto>.Failure("Tenant no encontrado");
 
-        var dto = new TenantDto(
-            tenant.Id, tenant.Name, tenant.Slug, tenant.Ruc, tenant.BusinessName,
-            tenant.Address, tenant.Phone, tenant.Email, tenant.LogoUrl,
-            tenant.SignatureUrl, tenant.FullAddress, tenant.Latitude, tenant.Longitude,
-            tenant.IdentificationType, tenant.IdentificationNumber,
-            tenant.Currency, tenant.TaxPercentage, tenant.TimeZone,
-            tenant.Status, tenant.DeliveryOperationMode, tenant.DeliveryZoneId,
-            tenant.DeliveryZone?.Name, tenant.OnboardingCompleted,
-            tenant.TrialExpiresAt, tenant.CreatedAt, tenant.Users.Count
-        );
-
-        return Result<TenantDto>.Success(dto);
+        return Result<TenantDto>.Success(MapToDto(tenant));
     }
 
     public async Task<Result<TenantDto>> UpdateAsync(Guid id, UpdateTenantRequest request, CancellationToken cancellationToken = default)
@@ -105,18 +100,7 @@ public class TenantManagementService : ITenantManagementService
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        var dto = new TenantDto(
-            tenant.Id, tenant.Name, tenant.Slug, tenant.Ruc, tenant.BusinessName,
-            tenant.Address, tenant.Phone, tenant.Email, tenant.LogoUrl,
-            tenant.SignatureUrl, tenant.FullAddress, tenant.Latitude, tenant.Longitude,
-            tenant.IdentificationType, tenant.IdentificationNumber,
-            tenant.Currency, tenant.TaxPercentage, tenant.TimeZone,
-            tenant.Status, tenant.DeliveryOperationMode, tenant.DeliveryZoneId,
-            tenant.DeliveryZone?.Name, tenant.OnboardingCompleted,
-            tenant.TrialExpiresAt, tenant.CreatedAt, tenant.Users.Count
-        );
-
-        return Result<TenantDto>.Success(dto);
+        return Result<TenantDto>.Success(MapToDto(tenant));
     }
 
     public async Task<Result> UpdateStatusAsync(Guid id, UpdateTenantStatusRequest request, CancellationToken cancellationToken = default)
@@ -154,5 +138,110 @@ public class TenantManagementService : ITenantManagementService
         await _context.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
+    }
+
+    public async Task<Result<TenantBrandingDto>> GetBrandingBySlugAsync(string slug, CancellationToken cancellationToken = default)
+    {
+        var tenant = await _context.Tenants
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.Slug == slug, cancellationToken);
+
+        if (tenant == null)
+            return Result<TenantBrandingDto>.Failure("Restaurante no encontrado");
+
+        return Result<TenantBrandingDto>.Success(MapToBrandingDto(tenant));
+    }
+
+    public async Task<Result<TenantBrandingDto>> GetBrandingByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var tenant = await _context.Tenants
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
+
+        if (tenant == null)
+            return Result<TenantBrandingDto>.Failure("Tenant no encontrado");
+
+        return Result<TenantBrandingDto>.Success(MapToBrandingDto(tenant));
+    }
+
+    public async Task<Result<TenantBrandingDto>> UpdateBrandingAsync(Guid id, UpdateTenantBrandingRequest request, CancellationToken cancellationToken = default)
+    {
+        var tenant = await _context.Tenants.FindAsync([id], cancellationToken);
+
+        if (tenant == null)
+            return Result<TenantBrandingDto>.Failure("Tenant no encontrado");
+
+        if (request.PrimaryColor != null) tenant.PrimaryColor = request.PrimaryColor;
+        if (request.SecondaryColor != null) tenant.SecondaryColor = request.SecondaryColor;
+        if (request.AccentColor != null) tenant.AccentColor = request.AccentColor;
+        if (request.TemplateName != null) tenant.TemplateName = request.TemplateName;
+        if (request.FontHeading != null) tenant.FontHeading = request.FontHeading;
+        if (request.FontBody != null) tenant.FontBody = request.FontBody;
+        if (request.CustomCss != null) tenant.CustomCss = request.CustomCss;
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Branding actualizado para tenant {TenantId}", id);
+
+        return Result<TenantBrandingDto>.Success(MapToBrandingDto(tenant));
+    }
+
+    public async Task<Result<string>> UploadLogoAsync(Guid id, Stream fileStream, string fileName, CancellationToken cancellationToken = default)
+    {
+        var tenant = await _context.Tenants.FindAsync([id], cancellationToken);
+
+        if (tenant == null)
+            return Result<string>.Failure("Tenant no encontrado");
+
+        var url = await _fileStorage.SaveFileAsync(fileStream, fileName, "tenant-logos", cancellationToken);
+        tenant.LogoUrl = url;
+        await _context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Logo actualizado para tenant {TenantId}: {Url}", id, url);
+
+        return Result<string>.Success(url);
+    }
+
+    public async Task<Result<string>> UploadCoverImageAsync(Guid id, Stream fileStream, string fileName, CancellationToken cancellationToken = default)
+    {
+        var tenant = await _context.Tenants.FindAsync([id], cancellationToken);
+
+        if (tenant == null)
+            return Result<string>.Failure("Tenant no encontrado");
+
+        var url = await _fileStorage.SaveFileAsync(fileStream, fileName, "tenant-covers", cancellationToken);
+        tenant.CoverImageUrl = url;
+        await _context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Cover image actualizado para tenant {TenantId}: {Url}", id, url);
+
+        return Result<string>.Success(url);
+    }
+
+    private static TenantDto MapToDto(Tenant tenant)
+    {
+        return new TenantDto(
+            tenant.Id, tenant.Name, tenant.Slug, tenant.Ruc, tenant.BusinessName,
+            tenant.Address, tenant.Phone, tenant.Email, tenant.LogoUrl,
+            tenant.SignatureUrl, tenant.FullAddress, tenant.Latitude, tenant.Longitude,
+            tenant.IdentificationType, tenant.IdentificationNumber,
+            tenant.PrimaryColor, tenant.SecondaryColor, tenant.AccentColor,
+            tenant.TemplateName, tenant.FaviconUrl, tenant.CoverImageUrl,
+            tenant.FontHeading, tenant.FontBody, tenant.CustomCss,
+            tenant.Currency, tenant.TaxPercentage, tenant.TimeZone,
+            tenant.Status, tenant.DeliveryOperationMode, tenant.DeliveryZoneId,
+            tenant.DeliveryZone?.Name, tenant.OnboardingCompleted,
+            tenant.TrialExpiresAt, tenant.CreatedAt, tenant.Users.Count
+        );
+    }
+
+    private static TenantBrandingDto MapToBrandingDto(Tenant tenant)
+    {
+        return new TenantBrandingDto(
+            tenant.Name, tenant.Slug, tenant.LogoUrl, tenant.CoverImageUrl,
+            tenant.FaviconUrl, tenant.PrimaryColor, tenant.SecondaryColor,
+            tenant.AccentColor, tenant.TemplateName, tenant.FontHeading,
+            tenant.FontBody, tenant.CustomCss, tenant.Currency, tenant.TaxPercentage
+        );
     }
 }

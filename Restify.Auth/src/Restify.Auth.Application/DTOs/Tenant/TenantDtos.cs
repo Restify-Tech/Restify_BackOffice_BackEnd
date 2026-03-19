@@ -18,6 +18,15 @@ public record TenantDto(
     double? Longitude,
     IdentificationType? IdentificationType,
     string? IdentificationNumber,
+    string PrimaryColor,
+    string SecondaryColor,
+    string AccentColor,
+    string TemplateName,
+    string? FaviconUrl,
+    string? CoverImageUrl,
+    string? FontHeading,
+    string? FontBody,
+    string? CustomCss,
     string Currency,
     decimal TaxPercentage,
     string TimeZone,
@@ -29,6 +38,39 @@ public record TenantDto(
     DateTime? TrialExpiresAt,
     DateTime CreatedAt,
     int UserCount
+);
+
+/// <summary>
+/// DTO publico de branding para menu QR (AllowAnonymous)
+/// </summary>
+public record TenantBrandingDto(
+    string Name,
+    string Slug,
+    string? LogoUrl,
+    string? CoverImageUrl,
+    string? FaviconUrl,
+    string PrimaryColor,
+    string SecondaryColor,
+    string AccentColor,
+    string TemplateName,
+    string? FontHeading,
+    string? FontBody,
+    string? CustomCss,
+    string Currency,
+    decimal TaxPercentage
+);
+
+/// <summary>
+/// Request para actualizar branding del tenant
+/// </summary>
+public record UpdateTenantBrandingRequest(
+    string? PrimaryColor,
+    string? SecondaryColor,
+    string? AccentColor,
+    string? TemplateName,
+    string? FontHeading,
+    string? FontBody,
+    string? CustomCss
 );
 
 public record TenantListDto(
