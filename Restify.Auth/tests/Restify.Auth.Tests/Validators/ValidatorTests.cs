@@ -19,7 +19,7 @@ public class ValidatorTests
     [Fact]
     public void LoginRequest_EmailVacio_Falla()
     {
-        var request = new LoginRequest("", "Admin123!");
+        var request = new LoginRequest("", null, "Admin123!");
         var result = _loginValidator.TestValidate(request);
         result.ShouldHaveValidationErrorFor(x => x.Email)
             .WithErrorMessage("El email es requerido");
@@ -28,7 +28,7 @@ public class ValidatorTests
     [Fact]
     public void LoginRequest_EmailInvalido_Falla()
     {
-        var request = new LoginRequest("no-es-email", "Admin123!");
+        var request = new LoginRequest("no-es-email", null, "Admin123!");
         var result = _loginValidator.TestValidate(request);
         result.ShouldHaveValidationErrorFor(x => x.Email);
     }
@@ -36,7 +36,7 @@ public class ValidatorTests
     [Fact]
     public void LoginRequest_PasswordVacio_Falla()
     {
-        var request = new LoginRequest("user@test.com", "");
+        var request = new LoginRequest("user@test.com", null, "");
         var result = _loginValidator.TestValidate(request);
         result.ShouldHaveValidationErrorFor(x => x.Password)
             .WithErrorMessage("La contraseña es requerida");
@@ -45,7 +45,7 @@ public class ValidatorTests
     [Fact]
     public void LoginRequest_DatosValidos_Pasa()
     {
-        var request = new LoginRequest("user@test.com", "Admin123!");
+        var request = new LoginRequest("user@test.com", null, "Admin123!");
         var result = _loginValidator.TestValidate(request);
         result.ShouldNotHaveAnyValidationErrors();
     }
@@ -57,7 +57,7 @@ public class ValidatorTests
     [Fact]
     public void CreateUser_EmailVacio_Falla()
     {
-        var request = new CreateUserRequest("", "Admin123!", "Juan", "Perez", null, new[] { Guid.NewGuid() });
+        var request = new CreateUserRequest("", null, "Admin123!", "Juan", "Perez", null, new[] { Guid.NewGuid() });
         var result = _createUserValidator.TestValidate(request);
         result.ShouldHaveValidationErrorFor(x => x.Email);
     }
@@ -65,7 +65,7 @@ public class ValidatorTests
     [Fact]
     public void CreateUser_PasswordCorto_Falla()
     {
-        var request = new CreateUserRequest("user@test.com", "Ab1!", "Juan", "Perez", null, new[] { Guid.NewGuid() });
+        var request = new CreateUserRequest("user@test.com", null, "Ab1!", "Juan", "Perez", null, new[] { Guid.NewGuid() });
         var result = _createUserValidator.TestValidate(request);
         result.ShouldHaveValidationErrorFor(x => x.Password)
             .WithErrorMessage("La contraseña debe tener al menos 8 caracteres");
@@ -74,7 +74,7 @@ public class ValidatorTests
     [Fact]
     public void CreateUser_PasswordSinMayuscula_Falla()
     {
-        var request = new CreateUserRequest("user@test.com", "abcdefgh1!", "Juan", "Perez", null, new[] { Guid.NewGuid() });
+        var request = new CreateUserRequest("user@test.com", null, "abcdefgh1!", "Juan", "Perez", null, new[] { Guid.NewGuid() });
         var result = _createUserValidator.TestValidate(request);
         result.ShouldHaveValidationErrorFor(x => x.Password)
             .WithErrorMessage("La contraseña debe contener al menos una mayúscula");
@@ -83,7 +83,7 @@ public class ValidatorTests
     [Fact]
     public void CreateUser_NombreVacio_Falla()
     {
-        var request = new CreateUserRequest("user@test.com", "Admin123!", "", "Perez", null, new[] { Guid.NewGuid() });
+        var request = new CreateUserRequest("user@test.com", null, "Admin123!", "", "Perez", null, new[] { Guid.NewGuid() });
         var result = _createUserValidator.TestValidate(request);
         result.ShouldHaveValidationErrorFor(x => x.FirstName);
     }
@@ -91,7 +91,7 @@ public class ValidatorTests
     [Fact]
     public void CreateUser_ApellidoVacio_Falla()
     {
-        var request = new CreateUserRequest("user@test.com", "Admin123!", "Juan", "", null, new[] { Guid.NewGuid() });
+        var request = new CreateUserRequest("user@test.com", null, "Admin123!", "Juan", "", null, new[] { Guid.NewGuid() });
         var result = _createUserValidator.TestValidate(request);
         result.ShouldHaveValidationErrorFor(x => x.LastName);
     }
@@ -99,7 +99,7 @@ public class ValidatorTests
     [Fact]
     public void CreateUser_SinRoles_Falla()
     {
-        var request = new CreateUserRequest("user@test.com", "Admin123!", "Juan", "Perez", null, Enumerable.Empty<Guid>());
+        var request = new CreateUserRequest("user@test.com", null, "Admin123!", "Juan", "Perez", null, Enumerable.Empty<Guid>());
         var result = _createUserValidator.TestValidate(request);
         result.ShouldHaveValidationErrorFor(x => x.RoleIds);
     }
@@ -107,7 +107,7 @@ public class ValidatorTests
     [Fact]
     public void CreateUser_DatosValidos_Pasa()
     {
-        var request = new CreateUserRequest("user@test.com", "Admin123!", "Juan", "Perez", "0999999999", new[] { Guid.NewGuid() });
+        var request = new CreateUserRequest("user@test.com", null, "Admin123!", "Juan", "Perez", "0999999999", new[] { Guid.NewGuid() });
         var result = _createUserValidator.TestValidate(request);
         result.ShouldNotHaveAnyValidationErrors();
     }
@@ -330,7 +330,7 @@ public class ValidatorTests
     [InlineData("missing-domain@")]
     public void LoginRequest_EmailsInvalidos_Fallan(string email)
     {
-        var request = new LoginRequest(email, "Admin123!");
+        var request = new LoginRequest(email, null, "Admin123!");
         var result = _loginValidator.TestValidate(request);
         result.ShouldHaveValidationErrorFor(x => x.Email);
     }
@@ -343,7 +343,7 @@ public class ValidatorTests
     [InlineData("NoSpecial123")]   // sin caracter especial
     public void CreateUser_PasswordsInvalidos_Fallan(string password)
     {
-        var request = new CreateUserRequest("user@test.com", password, "Juan", "Perez", null, new[] { Guid.NewGuid() });
+        var request = new CreateUserRequest("user@test.com", null, password, "Juan", "Perez", null, new[] { Guid.NewGuid() });
         var result = _createUserValidator.TestValidate(request);
         result.ShouldHaveValidationErrorFor(x => x.Password);
     }

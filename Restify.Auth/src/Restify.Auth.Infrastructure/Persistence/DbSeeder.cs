@@ -331,6 +331,7 @@ public class DbSeeder(
             Name = "Restaurante Demo",
             Slug = "demo",
             Ruc = "9999999999001",
+            IdentificationNumber = "9999999999001",
             BusinessName = "Restaurante Demo S.A.",
             Email = "demo@restaurant.com",
             Phone = "+593999999999",
@@ -541,6 +542,7 @@ public class DbSeeder(
         {
             TenantId = tenant.Id,
             Email = "admin@demo.com",
+            Username = "admin",
             PasswordHash = _passwordService.HashPassword("Admin123!"),
             FirstName = "Admin",
             LastName = "Demo",

@@ -5,6 +5,7 @@ namespace Restify.Auth.Application.DTOs.Users;
 /// </summary>
 public record CreateUserRequest(
     string Email,
+    string? Username,
     string Password,
     string FirstName,
     string LastName,

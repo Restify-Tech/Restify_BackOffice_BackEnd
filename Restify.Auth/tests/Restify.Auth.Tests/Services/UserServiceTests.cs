@@ -134,6 +134,7 @@ public class UserServiceTests : IDisposable
         // Arrange
         var request = new CreateUserRequest(
             Email: "nuevo@test.com",
+            Username: null,
             Password: "NuevoPass123!",
             FirstName: "Nuevo",
             LastName: "Usuario",
@@ -159,6 +160,7 @@ public class UserServiceTests : IDisposable
         // Arrange
         var request = new CreateUserRequest(
             Email: "existing@test.com",
+            Username: null,
             Password: "NuevoPass123!",
             FirstName: "Duplicado",
             LastName: "Usuario",
@@ -240,6 +242,7 @@ public class UserServiceTests : IDisposable
         var fakeRoleId = Guid.NewGuid();
         var request = new CreateUserRequest(
             Email: "nuevo2@test.com",
+            Username: null,
             Password: "NuevoPass123!",
             FirstName: "Nuevo",
             LastName: "Usuario",

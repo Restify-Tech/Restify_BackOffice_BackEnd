@@ -10,6 +10,7 @@ public interface ITenantManagementService
     Task<Result<TenantDto>> UpdateAsync(Guid id, UpdateTenantRequest request, CancellationToken cancellationToken = default);
     Task<Result> UpdateStatusAsync(Guid id, UpdateTenantStatusRequest request, CancellationToken cancellationToken = default);
     Task<Result> UpdateDeliveryModeAsync(Guid id, UpdateTenantDeliveryModeRequest request, CancellationToken cancellationToken = default);
+    Task<Result<TenantBrandingDto>> GetBrandingByIdentificationAsync(string identificationNumber, CancellationToken cancellationToken = default);
     Task<Result<TenantBrandingDto>> GetBrandingBySlugAsync(string slug, CancellationToken cancellationToken = default);
     Task<Result<TenantBrandingDto>> GetBrandingByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<Result<TenantBrandingDto>> UpdateBrandingAsync(Guid id, UpdateTenantBrandingRequest request, CancellationToken cancellationToken = default);

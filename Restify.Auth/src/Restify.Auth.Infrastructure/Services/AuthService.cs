@@ -33,7 +33,7 @@ public class AuthService : IAuthService
 
     public async Task<Result<LoginResponse>> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
     {
-        // Buscar tenant por slug si se proporciona
+        // Resolver tenant por slug o por identificacion (RUC/cedula)
         Tenant? tenant = null;
         if (!string.IsNullOrEmpty(request.TenantSlug))
         {
@@ -43,16 +43,33 @@ public class AuthService : IAuthService
             if (tenant == null)
                 return Result<LoginResponse>.Failure("Tenant no encontrado o inactivo");
         }
+        else if (!string.IsNullOrEmpty(request.IdentificationNumber))
+        {
+            tenant = await _context.Tenants
+                .FirstOrDefaultAsync(t =>
+                    (t.IdentificationNumber == request.IdentificationNumber || t.Ruc == request.IdentificationNumber)
+                    && t.Status == TenantStatus.Active, cancellationToken);
 
-        // Buscar usuario
+            if (tenant == null)
+                return Result<LoginResponse>.Failure("No se encontró un restaurante con esa identificación");
+        }
+
+        // Buscar usuario por email o username
         var query = _context.Users
-            .IgnoreQueryFilters() // Ignorar filtro de tenant para login
+            .IgnoreQueryFilters()
             .Include(u => u.Tenant)
             .Include(u => u.UserRoles)
                 .ThenInclude(ur => ur.Role)
                     .ThenInclude(r => r.RolePermissions)
                         .ThenInclude(rp => rp.Permission)
-            .Where(u => u.Email == request.Email);
+            .AsQueryable();
+
+        if (!string.IsNullOrEmpty(request.Email))
+            query = query.Where(u => u.Email == request.Email);
+        else if (!string.IsNullOrEmpty(request.Username))
+            query = query.Where(u => u.Username == request.Username);
+        else
+            return Result<LoginResponse>.Failure("Debe proporcionar un email o nombre de usuario");
 
         if (tenant != null)
             query = query.Where(u => u.TenantId == tenant.Id);
@@ -67,7 +84,8 @@ public class AuthService : IAuthService
 
         if (!_passwordService.VerifyPassword(request.Password, user.PasswordHash))
         {
-            _logger.LogWarning("Intento de login fallido para {Email}", request.Email);
+            var credential = request.Email ?? request.Username;
+            _logger.LogWarning("Intento de login fallido para {Credential}", credential);
             return Result<LoginResponse>.Failure("Credenciales inválidas");
         }
 
@@ -90,7 +108,8 @@ public class AuthService : IAuthService
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        _logger.LogInformation("Login exitoso para {Email}", request.Email);
+        var logCredential = request.Email ?? request.Username;
+        _logger.LogInformation("Login exitoso para {Credential}", logCredential);
 
         return Result<LoginResponse>.Success(new LoginResponse(
             accessToken,
@@ -99,6 +118,7 @@ public class AuthService : IAuthService
             new UserInfoDto(
                 user.Id,
                 user.Email,
+                user.Username,
                 user.FirstName,
                 user.LastName,
                 user.TenantId,
@@ -231,6 +251,7 @@ public class AuthService : IAuthService
         return Result<UserInfoDto>.Success(new UserInfoDto(
             user.Id,
             user.Email,
+            user.Username,
             user.FirstName,
             user.LastName,
             user.TenantId,

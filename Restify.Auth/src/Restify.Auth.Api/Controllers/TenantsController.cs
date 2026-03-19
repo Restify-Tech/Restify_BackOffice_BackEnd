@@ -97,6 +97,21 @@ public class TenantsController : ControllerBase
     }
 
     /// <summary>
+    /// Obtener branding publico por RUC o cedula (para login 2 pasos)
+    /// </summary>
+    [AllowAnonymous]
+    [HttpGet("branding/by-identification/{identificationNumber}")]
+    public async Task<IActionResult> GetBrandingByIdentification(string identificationNumber, CancellationToken cancellationToken)
+    {
+        var result = await _service.GetBrandingByIdentificationAsync(identificationNumber, cancellationToken);
+
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
+
+        return Ok(result.Data);
+    }
+
+    /// <summary>
     /// Obtener branding publico por slug (para menu QR)
     /// </summary>
     [AllowAnonymous]

@@ -81,6 +81,7 @@ public class UserService : IUserService
         var items = users.Select(u => new UserListDto(
             u.Id,
             u.Email,
+            u.Username,
             $"{u.FirstName} {u.LastName}",
             u.Status,
             u.LastLoginAt,
@@ -113,10 +114,21 @@ public class UserService : IUserService
         if (roles.Count != request.RoleIds.Count())
             return Result<UserDto>.Failure("Uno o más roles no existen");
 
+        // Verificar username único si se proporciona
+        if (!string.IsNullOrEmpty(request.Username))
+        {
+            var usernameExists = await _context.Users
+                .AnyAsync(u => u.Username == request.Username, cancellationToken);
+
+            if (usernameExists)
+                return Result<UserDto>.Failure("El nombre de usuario ya está registrado");
+        }
+
         var user = new User
         {
             TenantId = _currentUser.TenantId!.Value,
             Email = request.Email,
+            Username = request.Username,
             PasswordHash = _passwordService.HashPassword(request.Password),
             FirstName = request.FirstName,
             LastName = request.LastName,
@@ -247,6 +259,7 @@ public class UserService : IUserService
         return new UserDto(
             user.Id,
             user.Email,
+            user.Username,
             user.FirstName,
             user.LastName,
             user.Phone,

@@ -140,6 +140,23 @@ public class TenantManagementService : ITenantManagementService
         return Result.Success();
     }
 
+    public async Task<Result<TenantBrandingDto>> GetBrandingByIdentificationAsync(string identificationNumber, CancellationToken cancellationToken = default)
+    {
+        var tenant = await _context.Tenants
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t =>
+                t.IdentificationNumber == identificationNumber || t.Ruc == identificationNumber,
+                cancellationToken);
+
+        if (tenant == null)
+            return Result<TenantBrandingDto>.Failure("No se encontró un restaurante con esa identificación");
+
+        if (tenant.Status != Domain.Enums.TenantStatus.Active)
+            return Result<TenantBrandingDto>.Failure("El restaurante no está activo");
+
+        return Result<TenantBrandingDto>.Success(MapToBrandingDto(tenant));
+    }
+
     public async Task<Result<TenantBrandingDto>> GetBrandingBySlugAsync(string slug, CancellationToken cancellationToken = default)
     {
         var tenant = await _context.Tenants

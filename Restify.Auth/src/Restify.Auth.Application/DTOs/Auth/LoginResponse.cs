@@ -16,6 +16,7 @@ public record LoginResponse(
 public record UserInfoDto(
     Guid Id,
     string Email,
+    string? Username,
     string FirstName,
     string LastName,
     Guid TenantId,

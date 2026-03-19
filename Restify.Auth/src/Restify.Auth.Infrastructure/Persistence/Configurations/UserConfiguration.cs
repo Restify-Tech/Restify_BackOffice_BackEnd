@@ -20,6 +20,14 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.HasIndex(u => new { u.TenantId, u.Email })
             .IsUnique();
 
+        builder.Property(u => u.Username)
+            .HasMaxLength(50);
+
+        // Username único por tenant (solo cuando no es null)
+        builder.HasIndex(u => new { u.TenantId, u.Username })
+            .IsUnique()
+            .HasFilter("\"Username\" IS NOT NULL");
+
         builder.Property(u => u.PasswordHash)
             .IsRequired()
             .HasMaxLength(500);
