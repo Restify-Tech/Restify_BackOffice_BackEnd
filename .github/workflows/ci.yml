@@ -30,6 +30,6 @@ jobs:
 
       - name: Test
         run: |
-          dotnet test Restify.Auth/Restify.Auth.sln --no-build || true
-          dotnet test Restify.Core/Restify.Core.sln --no-build || true
-          dotnet test Restify.BackOffice/Restify.BackOffice.sln --no-build || true
+          dotnet test Restify.Auth/Restify.Auth.sln --no-build
+          dotnet test Restify.Core/Restify.Core.sln --no-build
+          dotnet test Restify.BackOffice/Restify.BackOffice.sln --no-build
