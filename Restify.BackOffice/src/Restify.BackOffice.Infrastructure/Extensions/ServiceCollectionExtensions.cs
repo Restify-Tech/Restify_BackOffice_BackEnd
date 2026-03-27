@@ -3,8 +3,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Restify.BackOffice.Application.Interfaces;
+using Restify.BackOffice.Infrastructure.BenefitHub;
 using Restify.BackOffice.Infrastructure.Consumers;
 using Restify.BackOffice.Infrastructure.Messaging;
+using Restify.BackOffice.Infrastructure.Notifications;
 using Restify.BackOffice.Infrastructure.Persistence;
 using Restify.BackOffice.Infrastructure.Persistence.Repositories;
 using Restify.BackOffice.Infrastructure.Services;
@@ -102,8 +104,13 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAIImagePromptTemplateService, AIImagePromptTemplateService>();
         services.AddScoped<IAIImageService, AIImageService>();
 
-        // HttpClientFactory for OpenAI API
-        services.AddHttpClient("OpenAI");
+        // HttpClientFactory for VisualCreative API
+        services.AddHttpClient("VisualCreative", client =>
+        {
+            var baseUrl = configuration["VisualCreative:BaseUrl"] ?? "http://localhost:5600";
+            client.BaseAddress = new Uri(baseUrl);
+            client.Timeout = TimeSpan.FromSeconds(60);
+        });
 
         // Accounting Repositories
         services.AddScoped<IAccountingAccountRepository, AccountingAccountRepository>();
@@ -147,6 +154,70 @@ public static class ServiceCollectionExtensions
         // Transfer Approval
         services.AddScoped<ITransferPaymentRequestRepository, TransferPaymentRequestRepository>();
         services.AddScoped<ITransferApprovalService, TransferApprovalService>();
+
+        // Multi-Sucursal
+        services.AddScoped<IBranchService, BranchService>();
+        services.AddScoped<IManagerAssignmentService, ManagerAssignmentService>();
+
+        // Cash Closing y Turnos (Fase 9)
+        services.AddScoped<ICashClosingService, CashClosingService>();
+        services.AddScoped<IShiftService, ShiftService>();
+
+        // Fase 11 — Features Operativos Criticos
+        services.AddScoped<IRecipeService, RecipeService>();
+        services.AddScoped<ITableReservationService, TableReservationService>();
+        services.AddScoped<IPromotionService, PromotionService>();
+        services.AddScoped<IStockAlertService, StockAlertService>();
+
+        // Fase 12 — Franquicias y Webhooks
+        services.AddScoped<IFranchiseService, FranchiseService>();
+        services.AddScoped<IWebhookService, WebhookService>();
+
+        // Fase 13 — Split Payment
+        services.AddScoped<ISplitPaymentService, SplitPaymentService>();
+
+        // Notification Client (SMS) — Null Object si no esta configurado
+        var notificationBaseUrl = configuration["NotificationService:BaseUrl"];
+        var notificationApiKey = configuration["NotificationService:ApiKey"];
+
+        if (!string.IsNullOrEmpty(notificationBaseUrl))
+        {
+            services.AddHttpClient<INotificationClient, HttpNotificationClient>(client =>
+            {
+                client.BaseAddress = new Uri(notificationBaseUrl);
+                client.Timeout = TimeSpan.FromMilliseconds(2000);
+                if (!string.IsNullOrEmpty(notificationApiKey))
+                    client.DefaultRequestHeaders.Add("X-Api-Key", notificationApiKey);
+            });
+        }
+        else
+        {
+            services.AddScoped<INotificationClient, NullNotificationClient>();
+        }
+
+        // HttpClient para despacho de webhooks outbound
+        services.AddHttpClient("Webhook", client =>
+        {
+            client.DefaultRequestHeaders.Add("User-Agent", "Restify-Webhook/1.0");
+        });
+
+        // BenefitHub Integration (Fase 10)
+        var benefitHubBaseUrl = configuration["BenefitHub:BaseUrl"];
+        var benefitHubApiKey = configuration["BenefitHub:ApiKey"];
+
+        if (!string.IsNullOrEmpty(benefitHubBaseUrl) && !string.IsNullOrEmpty(benefitHubApiKey))
+        {
+            services.AddHttpClient<IBenefitHubClient, HttpBenefitHubClient>(client =>
+            {
+                client.BaseAddress = new Uri(benefitHubBaseUrl);
+                client.DefaultRequestHeaders.Add("X-BenefitHub-Key", benefitHubApiKey);
+                client.Timeout = TimeSpan.FromMilliseconds(500); // fail fast
+            });
+        }
+        else
+        {
+            services.AddScoped<IBenefitHubClient, NullBenefitHubClient>();
+        }
 
         // MassTransit + RabbitMQ Event Publisher
         services.AddScoped<IEventPublisher, RabbitMqPublisher>();

@@ -1,7 +1,11 @@
+using System.Globalization;
+using System.Text;
 using Restify.BackOffice.Application.DTOs.Reports;
 using Restify.BackOffice.Application.Interfaces;
+using Restify.BackOffice.Domain.Constants;
 using Restify.BackOffice.Domain.Entities;
 using Restify.BackOffice.Domain.Enums;
+using Restify.Core.Application.DTOs.Common;
 
 namespace Restify.BackOffice.Infrastructure.Services;
 
@@ -22,6 +26,426 @@ public class ReportService : IReportService
         _invoiceRepository = invoiceRepository;
         _orderRepository = orderRepository;
         _tableRepository = tableRepository;
+    }
+
+    // ========== FRONTEND AGGREGATED REPORTS ==========
+
+    public async Task<Result<FrontendSalesReportDto>> GetFrontendSalesReportAsync(
+        DateTime from, DateTime to, string? paymentMethod, Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // Totales principales
+            var (totalSales, invoiceCount, averageTicket) = await _reportRepository
+                .GetSalesTotalsAsync(from, to, tenantId, cancellationToken);
+
+            // Impuestos y descuentos
+            var (totalTax, totalDiscount) = await _reportRepository
+                .GetTaxAndDiscountTotalsAsync(from, to, tenantId, cancellationToken);
+
+            // Comparativa con periodo anterior
+            var periodDays = (to - from).Days + 1;
+            var previousFrom = from.AddDays(-periodDays);
+            var previousTo = from.AddDays(-1);
+            var (previousSales, _, _) = await _reportRepository
+                .GetSalesTotalsAsync(previousFrom, previousTo, tenantId, cancellationToken);
+
+            decimal? comparisonPercentage = null;
+            if (previousSales > 0)
+                comparisonPercentage = ((totalSales - previousSales) / previousSales) * 100;
+
+            // Ventas por fecha
+            var dailyDetailed = await _reportRepository
+                .GetDailySalesDetailedAsync(from, to, tenantId, cancellationToken);
+
+            var salesByDate = dailyDetailed.Select(d => new FrontendSalesByDateDto
+            {
+                Date = d.date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                InvoiceCount = d.invoiceCount,
+                Subtotal = d.subtotal,
+                Tax = d.tax,
+                Discount = d.discount,
+                Total = d.total,
+                OrderCount = d.orderCount,
+                AverageTicket = d.invoiceCount > 0 ? d.total / d.invoiceCount : 0
+            }).ToList();
+
+            // Ventas por hora
+            var hourlyData = await _reportRepository
+                .GetSalesByHourAsync(from, to, tenantId, cancellationToken);
+
+            var salesByHour = hourlyData.Select(h => new FrontendSalesByHourDto
+            {
+                Hour = h.hour,
+                HourLabel = $"{h.hour:00}:00",
+                InvoiceCount = h.orderCount,
+                Total = h.totalSales,
+                OrderCount = h.orderCount
+            }).OrderBy(h => h.Hour).ToList();
+
+            // Ventas por dia de la semana
+            var dayOfWeekData = await _reportRepository
+                .GetSalesByDayOfWeekAsync(from, to, tenantId, cancellationToken);
+
+            var salesByDayOfWeek = dayOfWeekData.Select(d => new FrontendSalesByDayOfWeekDto
+            {
+                DayOfWeek = d.dayOfWeek,
+                DayName = d.dayOfWeek >= 0 && d.dayOfWeek < ReportConstants.DayNames.Length
+                    ? ReportConstants.DayNames[d.dayOfWeek]
+                    : d.dayOfWeek.ToString(),
+                InvoiceCount = d.invoiceCount,
+                Total = d.totalSales,
+                AverageTicket = d.invoiceCount > 0 ? d.totalSales / d.invoiceCount : 0
+            }).OrderBy(d => d.DayOfWeek).ToList();
+
+            // Ventas por metodo de pago
+            var paymentData = await _reportRepository
+                .GetSalesByPaymentMethodAsync(from, to, tenantId, cancellationToken);
+            var totalPaymentAmount = paymentData.Sum(p => p.totalAmount);
+
+            var salesByPaymentMethod = paymentData.Select(p => new FrontendSalesByPaymentMethodDto
+            {
+                PaymentMethod = ((PaymentMethod)p.paymentMethod).ToString(),
+                PaymentMethodName = GetPaymentMethodDisplayName((PaymentMethod)p.paymentMethod),
+                Count = p.invoiceCount,
+                Total = p.totalAmount,
+                Percentage = totalPaymentAmount > 0 ? (p.totalAmount / totalPaymentAmount) * 100 : 0
+            }).ToList();
+
+            // Calcular promedio diario
+            var daysInPeriod = periodDays > 0 ? periodDays : 1;
+            var averageDailySales = totalSales / daysInPeriod;
+
+            var report = new FrontendSalesReportDto
+            {
+                Summary = new FrontendSalesReportSummaryDto
+                {
+                    TotalSales = totalSales,
+                    TotalOrders = invoiceCount,
+                    AverageDailySales = averageDailySales,
+                    AverageTicket = averageTicket,
+                    TotalInvoices = invoiceCount,
+                    TotalTax = totalTax,
+                    TotalDiscount = totalDiscount,
+                    ComparisonPercentage = comparisonPercentage
+                },
+                SalesByDate = salesByDate,
+                SalesByHour = salesByHour,
+                SalesByDayOfWeek = salesByDayOfWeek,
+                SalesByPaymentMethod = salesByPaymentMethod
+            };
+
+            return Result<FrontendSalesReportDto>.Success(report);
+        }
+        catch (Exception)
+        {
+            return Result<FrontendSalesReportDto>.Failure(ReportConstants.ErrorSalesReport);
+        }
+    }
+
+    public async Task<Result<FrontendProductReportDto>> GetFrontendProductReportAsync(
+        DateTime from, DateTime to, string? categoryId, Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // Todos los productos con ventas
+            var allProducts = await _reportRepository
+                .GetAllProductSalesAsync(from, to, tenantId, cancellationToken);
+
+            // Filtrar por categoria si se especifica
+            if (!string.IsNullOrEmpty(categoryId))
+            {
+                allProducts = allProducts.Where(p => p.categoryName != null &&
+                    p.categoryName.Equals(categoryId, StringComparison.OrdinalIgnoreCase)).ToList();
+            }
+
+            var totalRevenue = allProducts.Sum(p => p.revenue);
+            var totalQuantity = allProducts.Sum(p => p.quantity);
+
+            // Top productos (ordenados por revenue)
+            var topProducts = allProducts
+                .OrderByDescending(p => p.revenue)
+                .Take(ReportConstants.DefaultTopProductsLimit)
+                .Select(p => new FrontendTopProductDto
+                {
+                    ProductId = p.productId.ToString(),
+                    ProductName = p.productName,
+                    CategoryName = p.categoryName ?? string.Empty,
+                    QuantitySold = p.quantity,
+                    TotalRevenue = p.revenue,
+                    AveragePrice = p.quantity > 0 ? p.revenue / p.quantity : 0,
+                    Percentage = totalRevenue > 0 ? (p.revenue / totalRevenue) * 100 : 0
+                }).ToList();
+
+            // Rendimiento de todos los productos
+            var productPerformance = allProducts
+                .OrderByDescending(p => p.revenue)
+                .Select(p => new FrontendProductPerformanceDto
+                {
+                    ProductId = p.productId.ToString(),
+                    ProductName = p.productName,
+                    CategoryName = p.categoryName ?? string.Empty,
+                    QuantitySold = p.quantity,
+                    Revenue = p.revenue,
+                    Cost = 0, // No disponible sin datos de costo
+                    Profit = p.revenue, // Sin costo, profit = revenue
+                    ProfitMargin = 100 // Sin costo, margen = 100%
+                }).ToList();
+
+            // Rendimiento por categoria
+            var categories = await _reportRepository
+                .GetCategoryPerformanceAsync(from, to, tenantId, cancellationToken);
+            var totalCategoryRevenue = categories.Sum(c => c.totalRevenue);
+
+            var categoryPerformance = categories.Select(c => new FrontendCategoryPerformanceDto
+            {
+                CategoryId = c.categoryId.ToString(),
+                CategoryName = c.categoryName,
+                ProductCount = c.productCount,
+                QuantitySold = c.totalQuantity,
+                Revenue = c.totalRevenue,
+                Percentage = totalCategoryRevenue > 0 ? (c.totalRevenue / totalCategoryRevenue) * 100 : 0
+            }).OrderByDescending(c => c.Revenue).ToList();
+
+            var report = new FrontendProductReportDto
+            {
+                TopProducts = topProducts,
+                ProductPerformance = productPerformance,
+                CategoryPerformance = categoryPerformance,
+                TotalProductsSold = totalQuantity,
+                TotalUniqueProducts = allProducts.Count
+            };
+
+            return Result<FrontendProductReportDto>.Success(report);
+        }
+        catch (Exception)
+        {
+            return Result<FrontendProductReportDto>.Failure(ReportConstants.ErrorProductReport);
+        }
+    }
+
+    public async Task<Result<FrontendStaffReportDto>> GetFrontendStaffReportAsync(
+        DateTime from, DateTime to, string? staffId, Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var employees = await _reportRepository
+                .GetEmployeePerformanceAsync(from, to, tenantId, cancellationToken);
+
+            // Filtrar por staffId si se especifica
+            if (!string.IsNullOrEmpty(staffId) && Guid.TryParse(staffId, out var staffGuid))
+            {
+                employees = employees.Where(e => e.employeeId == staffGuid).ToList();
+            }
+
+            var staffPerformance = employees.Select(e => new FrontendStaffPerformanceDto
+            {
+                StaffId = e.employeeId.ToString(),
+                StaffName = e.employeeName,
+                Role = "Mesero", // Rol por defecto basado en el contexto de ordenes
+                OrdersServed = e.totalOrders,
+                TotalSales = e.totalSales,
+                AverageTicket = e.customerCount > 0 ? e.totalSales / e.customerCount : 0,
+                AverageServiceTime = e.avgServiceTimeMinutes,
+                Tips = 0, // No disponible actualmente
+                Rating = null // No disponible actualmente
+            }).OrderByDescending(s => s.TotalSales).ToList();
+
+            var totalStaff = staffPerformance.Count;
+            var totalOrders = staffPerformance.Sum(s => s.OrdersServed);
+            var totalSales = staffPerformance.Sum(s => s.TotalSales);
+            var averagePerformance = totalStaff > 0 ? totalSales / totalStaff : 0;
+
+            var report = new FrontendStaffReportDto
+            {
+                StaffPerformance = staffPerformance,
+                TotalStaff = totalStaff,
+                TotalOrders = totalOrders,
+                TotalSales = totalSales,
+                AveragePerformance = averagePerformance
+            };
+
+            return Result<FrontendStaffReportDto>.Success(report);
+        }
+        catch (Exception)
+        {
+            return Result<FrontendStaffReportDto>.Failure(ReportConstants.ErrorStaffReport);
+        }
+    }
+
+    public async Task<Result<FrontendDashboardSummaryDto>> GetFrontendDashboardSummaryAsync(
+        Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var today = DateTime.UtcNow.Date;
+            var yesterday = today.AddDays(-1);
+
+            // Ventas de hoy
+            var (todaySales, todayInvoices, todayAvgTicket) = await _reportRepository
+                .GetSalesTotalsAsync(today, today, tenantId, cancellationToken);
+
+            // Ventas de ayer (para comparativa)
+            var (yesterdaySales, _, _) = await _reportRepository
+                .GetSalesTotalsAsync(yesterday, yesterday, tenantId, cancellationToken);
+
+            var salesGrowthPercentage = yesterdaySales > 0
+                ? ((todaySales - yesterdaySales) / yesterdaySales) * 100
+                : 0;
+
+            // Estado de mesas
+            var (tablesOccupied, totalTables) = await _reportRepository
+                .GetTableOccupancyAsync(tenantId, cancellationToken);
+
+            // Estado de pedidos
+            var (ordersPending, ordersInProgress, ordersReady) = await _reportRepository
+                .GetOrderStatusCountsAsync(tenantId, cancellationToken);
+
+            // Metodos de pago del dia
+            var paymentData = await _reportRepository
+                .GetSalesByPaymentMethodAsync(today, today, tenantId, cancellationToken);
+            var totalPaymentAmount = paymentData.Sum(p => p.totalAmount);
+
+            var paymentBreakdown = paymentData.Select(p => new FrontendSalesByPaymentMethodDto
+            {
+                PaymentMethod = ((PaymentMethod)p.paymentMethod).ToString(),
+                PaymentMethodName = GetPaymentMethodDisplayName((PaymentMethod)p.paymentMethod),
+                Count = p.invoiceCount,
+                Total = p.totalAmount,
+                Percentage = totalPaymentAmount > 0 ? (p.totalAmount / totalPaymentAmount) * 100 : 0
+            }).ToList();
+
+            // Top 5 productos del dia
+            var topProductsData = await _reportRepository
+                .GetTopSellingProductsAsync(today, today, 5, tenantId, cancellationToken);
+            var topProductsRevenue = topProductsData.Sum(p => p.revenue);
+
+            var topProducts = topProductsData.Select(p => new FrontendTopProductDto
+            {
+                ProductId = p.productId.ToString(),
+                ProductName = p.productName,
+                CategoryName = p.categoryName ?? string.Empty,
+                QuantitySold = p.quantity,
+                TotalRevenue = p.revenue,
+                AveragePrice = p.quantity > 0 ? p.revenue / p.quantity : 0,
+                Percentage = topProductsRevenue > 0 ? (p.revenue / topProductsRevenue) * 100 : 0
+            }).ToList();
+
+            var summary = new FrontendDashboardSummaryDto
+            {
+                TodaySales = todaySales,
+                TodayOrders = todayInvoices,
+                AverageTicket = todayAvgTicket,
+                SalesGrowthPercentage = salesGrowthPercentage,
+                TablesOccupied = tablesOccupied,
+                TotalTables = totalTables,
+                OrdersPending = ordersPending,
+                OrdersInProgress = ordersInProgress,
+                OrdersReady = ordersReady,
+                PaymentMethodBreakdown = paymentBreakdown,
+                TopProducts = topProducts
+            };
+
+            return Result<FrontendDashboardSummaryDto>.Success(summary);
+        }
+        catch (Exception)
+        {
+            return Result<FrontendDashboardSummaryDto>.Failure(ReportConstants.ErrorDashboardSummary);
+        }
+    }
+
+    public async Task<Result<byte[]>> ExportReportAsync(
+        ExportReportRequestDto request, Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (!DateTime.TryParse(request.Filters.DateFrom, out var from) ||
+                !DateTime.TryParse(request.Filters.DateTo, out var to))
+            {
+                return Result<byte[]>.Failure(ReportConstants.ErrorInvalidDateRange);
+            }
+
+            var csv = request.ReportType.ToLowerInvariant() switch
+            {
+                ReportConstants.ReportTypeSales => await GenerateSalesCsvAsync(from, to, tenantId, cancellationToken),
+                ReportConstants.ReportTypeProducts => await GenerateProductsCsvAsync(from, to, tenantId, cancellationToken),
+                ReportConstants.ReportTypeStaff => await GenerateStaffCsvAsync(from, to, tenantId, cancellationToken),
+                _ => null
+            };
+
+            if (csv == null)
+                return Result<byte[]>.Failure(ReportConstants.ErrorInvalidReportType);
+
+            return Result<byte[]>.Success(Encoding.UTF8.GetBytes(csv));
+        }
+        catch (Exception)
+        {
+            return Result<byte[]>.Failure(ReportConstants.ErrorExportReport);
+        }
+    }
+
+    // ========== CSV GENERATION HELPERS ==========
+
+    private async Task<string> GenerateSalesCsvAsync(DateTime from, DateTime to, Guid tenantId, CancellationToken cancellationToken)
+    {
+        var dailyData = await _reportRepository.GetDailySalesDetailedAsync(from, to, tenantId, cancellationToken);
+        var sb = new StringBuilder();
+        sb.AppendLine(ReportConstants.CsvSalesHeader);
+
+        foreach (var day in dailyData)
+        {
+            var avgTicket = day.invoiceCount > 0 ? day.total / day.invoiceCount : 0;
+            sb.AppendLine($"{day.date:yyyy-MM-dd},{day.invoiceCount},{day.subtotal:F2},{day.tax:F2},{day.discount:F2},{day.total:F2},{day.orderCount},{avgTicket:F2}");
+        }
+
+        return sb.ToString();
+    }
+
+    private async Task<string> GenerateProductsCsvAsync(DateTime from, DateTime to, Guid tenantId, CancellationToken cancellationToken)
+    {
+        var products = await _reportRepository.GetAllProductSalesAsync(from, to, tenantId, cancellationToken);
+        var totalRevenue = products.Sum(p => p.revenue);
+        var sb = new StringBuilder();
+        sb.AppendLine(ReportConstants.CsvProductsHeader);
+
+        foreach (var p in products.OrderByDescending(p => p.revenue))
+        {
+            var avgPrice = p.quantity > 0 ? p.revenue / p.quantity : 0;
+            var percentage = totalRevenue > 0 ? (p.revenue / totalRevenue) * 100 : 0;
+            sb.AppendLine($"\"{p.productName}\",\"{p.categoryName ?? string.Empty}\",{p.quantity},{p.revenue:F2},{avgPrice:F2},{percentage:F2}");
+        }
+
+        return sb.ToString();
+    }
+
+    private async Task<string> GenerateStaffCsvAsync(DateTime from, DateTime to, Guid tenantId, CancellationToken cancellationToken)
+    {
+        var employees = await _reportRepository.GetEmployeePerformanceAsync(from, to, tenantId, cancellationToken);
+        var sb = new StringBuilder();
+        sb.AppendLine(ReportConstants.CsvStaffHeader);
+
+        foreach (var e in employees)
+        {
+            var avgTicket = e.customerCount > 0 ? e.totalSales / e.customerCount : 0;
+            sb.AppendLine($"\"{e.employeeName}\",\"Mesero\",{e.totalOrders},{e.totalSales:F2},{avgTicket:F2},{e.avgServiceTimeMinutes:F1}");
+        }
+
+        return sb.ToString();
+    }
+
+    // ========== HELPER: Payment Method Display Name ==========
+
+    private static string GetPaymentMethodDisplayName(PaymentMethod method)
+    {
+        return method switch
+        {
+            PaymentMethod.Cash => "Efectivo",
+            PaymentMethod.CreditCard => "Tarjeta de Credito",
+            PaymentMethod.DebitCard => "Tarjeta de Debito",
+            PaymentMethod.Transfer => "Transferencia",
+            PaymentMethod.Other => "Otro",
+            _ => method.ToString()
+        };
     }
 
     // ========== SALES REPORTS ==========

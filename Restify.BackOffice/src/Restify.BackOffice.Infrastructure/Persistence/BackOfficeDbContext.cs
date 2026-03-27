@@ -77,6 +77,33 @@ public class BackOfficeDbContext : DbContext
     // Transfer Approvals
     public DbSet<TransferPaymentRequest> TransferPaymentRequests => Set<TransferPaymentRequest>();
 
+    // Multi-Sucursal
+    public DbSet<Branch> Branches => Set<Branch>();
+    public DbSet<ManagerAssignment> ManagerAssignments => Set<ManagerAssignment>();
+
+    // Cash Closing (Fase 9)
+    public DbSet<CashClosing> CashClosings => Set<CashClosing>();
+
+    // Shifts / Turnos (Fase 9)
+    public DbSet<ShiftTemplate> ShiftTemplates => Set<ShiftTemplate>();
+    public DbSet<ShiftAssignment> ShiftAssignments => Set<ShiftAssignment>();
+
+    // Fase 11 — Features Operativos
+    public DbSet<Recipe> Recipes => Set<Recipe>();
+    public DbSet<RecipeIngredient> RecipeIngredients => Set<RecipeIngredient>();
+    public DbSet<TableReservation> TableReservations => Set<TableReservation>();
+    public DbSet<Promotion> Promotions => Set<Promotion>();
+
+    // Fase 12 — Franquicias y Webhooks
+    public DbSet<FranchiseConfig> FranchiseConfigs => Set<FranchiseConfig>();
+    public DbSet<FranchiseeRelation> FranchiseeRelations => Set<FranchiseeRelation>();
+    public DbSet<WebhookConfig> WebhookConfigs => Set<WebhookConfig>();
+    public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
+
+    // Fase 13 — Split Payment
+    public DbSet<SplitPayment> SplitPayments => Set<SplitPayment>();
+    public DbSet<SplitPaymentItem> SplitPaymentItems => Set<SplitPaymentItem>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -219,6 +246,58 @@ public class BackOfficeDbContext : DbContext
 
         // Transfer Approvals
         modelBuilder.Entity<TransferPaymentRequest>()
+            .HasQueryFilter(x => _currentTenantId == null || x.TenantId == _currentTenantId);
+
+        // Multi-Sucursal
+        modelBuilder.Entity<Branch>()
+            .HasQueryFilter(x => _currentTenantId == null || x.TenantId == _currentTenantId);
+
+        modelBuilder.Entity<ManagerAssignment>()
+            .HasQueryFilter(x => _currentTenantId == null || x.TenantId == _currentTenantId);
+
+        // Cash Closing (Fase 9)
+        modelBuilder.Entity<CashClosing>()
+            .HasQueryFilter(x => _currentTenantId == null || x.TenantId == _currentTenantId);
+
+        // Shifts (Fase 9)
+        modelBuilder.Entity<ShiftTemplate>()
+            .HasQueryFilter(x => _currentTenantId == null || x.TenantId == _currentTenantId);
+
+        modelBuilder.Entity<ShiftAssignment>()
+            .HasQueryFilter(x => _currentTenantId == null || x.TenantId == _currentTenantId);
+
+        // Fase 11 — Features Operativos
+        modelBuilder.Entity<Recipe>()
+            .HasQueryFilter(x => _currentTenantId == null || x.TenantId == _currentTenantId);
+
+        modelBuilder.Entity<RecipeIngredient>()
+            .HasQueryFilter(x => _currentTenantId == null || x.TenantId == _currentTenantId);
+
+        modelBuilder.Entity<TableReservation>()
+            .HasQueryFilter(x => _currentTenantId == null || x.TenantId == _currentTenantId);
+
+        modelBuilder.Entity<Promotion>()
+            .HasQueryFilter(x => _currentTenantId == null || x.TenantId == _currentTenantId);
+
+        // Fase 12 — Franquicias y Webhooks
+        modelBuilder.Entity<FranchiseConfig>()
+            .HasQueryFilter(x => _currentTenantId == null || x.TenantId == _currentTenantId);
+
+        modelBuilder.Entity<FranchiseeRelation>()
+            .HasQueryFilter(x => _currentTenantId == null || x.TenantId == _currentTenantId);
+
+        modelBuilder.Entity<WebhookConfig>(entity =>
+        {
+            entity.HasQueryFilter(x => _currentTenantId == null || x.TenantId == _currentTenantId);
+            entity.Property(e => e.Events)
+                  .HasColumnType("jsonb");
+        });
+
+        modelBuilder.Entity<WebhookDelivery>()
+            .HasQueryFilter(x => _currentTenantId == null || x.TenantId == _currentTenantId);
+
+        // Fase 13 — Split Payment
+        modelBuilder.Entity<SplitPayment>()
             .HasQueryFilter(x => _currentTenantId == null || x.TenantId == _currentTenantId);
     }
 

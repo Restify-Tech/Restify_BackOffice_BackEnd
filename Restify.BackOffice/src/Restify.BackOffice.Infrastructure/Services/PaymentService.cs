@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Restify.BackOffice.Application.DTOs;
 using Restify.BackOffice.Application.Interfaces;
@@ -16,6 +17,8 @@ public class PaymentService : IPaymentService
     private readonly ICurrentUserService _currentUserService;
     private readonly IOrderNotificationService _notificationService;
     private readonly IEventPublisher _eventPublisher;
+    private readonly IBenefitHubClient _benefitHubClient;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<PaymentService> _logger;
 
     public PaymentService(
@@ -25,6 +28,8 @@ public class PaymentService : IPaymentService
         ICurrentUserService currentUserService,
         IOrderNotificationService notificationService,
         IEventPublisher eventPublisher,
+        IBenefitHubClient benefitHubClient,
+        IConfiguration configuration,
         ILogger<PaymentService> logger)
     {
         _paymentRepository = paymentRepository;
@@ -33,6 +38,8 @@ public class PaymentService : IPaymentService
         _currentUserService = currentUserService;
         _notificationService = notificationService;
         _eventPublisher = eventPublisher;
+        _benefitHubClient = benefitHubClient;
+        _configuration = configuration;
         _logger = logger;
     }
 
@@ -144,6 +151,39 @@ public class PaymentService : IPaymentService
                 PayerName = createdPayment.PayerName,
                 PayerIdentification = createdPayment.PayerIdentification
             }, cancellationToken);
+
+            // BenefitHub: acumular puntos (no critico — fallo no hace rollback del pago)
+            try
+            {
+                var externalCustomerId = order.CustomerId?.ToString()
+                    ?? order.CustomerPhone
+                    ?? "guest";
+
+                var benefitResult = await _benefitHubClient.ApplyAsync(new BenefitRequest(
+                    _configuration["BenefitHub:TenantSourceId"] ?? "",
+                    externalCustomerId,
+                    order.Id.ToString(),
+                    order.Items.Select(i => new BenefitItem(
+                        i.ProductId.ToString(),
+                        i.Product?.Name ?? "",
+                        i.UnitPrice,
+                        i.Quantity
+                    )).ToList(),
+                    order.Total,
+                    null
+                ));
+
+                if (benefitResult.PointsEarned > 0)
+                {
+                    _logger.LogInformation(
+                        "BenefitHub: {Points} puntos acumulados para cliente {Customer} en pedido {OrderNumber}",
+                        benefitResult.PointsEarned, externalCustomerId, order.OrderNumber);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "BenefitHub apply fallo para pedido {OrderNumber} — pago confirmado igual", order.OrderNumber);
+            }
         }
 
         return Result<PaymentDto>.Success(paymentDto);

@@ -1,10 +1,38 @@
 using Restify.BackOffice.Application.DTOs.Reports;
 using Restify.BackOffice.Domain.Enums;
+using Restify.Core.Application.DTOs.Common;
 
 namespace Restify.BackOffice.Application.Interfaces;
 
 public interface IReportService
 {
+    // ========== FRONTEND AGGREGATED REPORTS ==========
+
+    /// <summary>
+    /// Reporte de ventas agregado para el frontend
+    /// </summary>
+    Task<Result<FrontendSalesReportDto>> GetFrontendSalesReportAsync(DateTime from, DateTime to, string? paymentMethod, Guid tenantId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reporte de productos agregado para el frontend
+    /// </summary>
+    Task<Result<FrontendProductReportDto>> GetFrontendProductReportAsync(DateTime from, DateTime to, string? categoryId, Guid tenantId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reporte de personal agregado para el frontend
+    /// </summary>
+    Task<Result<FrontendStaffReportDto>> GetFrontendStaffReportAsync(DateTime from, DateTime to, string? staffId, Guid tenantId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Resumen del dashboard para el frontend
+    /// </summary>
+    Task<Result<FrontendDashboardSummaryDto>> GetFrontendDashboardSummaryAsync(Guid tenantId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Exportar reporte a CSV
+    /// </summary>
+    Task<Result<byte[]>> ExportReportAsync(ExportReportRequestDto request, Guid tenantId, CancellationToken cancellationToken = default);
+
     // ========== SALES REPORTS ==========
     
     /// <summary>

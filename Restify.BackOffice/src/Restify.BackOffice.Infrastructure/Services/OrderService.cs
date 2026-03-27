@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Restify.BackOffice.Application.DTOs;
 using Restify.BackOffice.Application.Interfaces;
 using Restify.BackOffice.Application.Mappings;
@@ -15,19 +17,31 @@ public class OrderService : IOrderService
     private readonly ITableRepository _tableRepository;
     private readonly ICurrentUserService _currentUserService;
     private readonly IOrderNotificationService _notificationService;
+    private readonly IBenefitHubClient _benefitHubClient;
+    private readonly IConfiguration _configuration;
+    private readonly IWebhookService _webhookService;
+    private readonly ILogger<OrderService> _logger;
 
     public OrderService(
         IOrderRepository orderRepository,
         IProductRepository productRepository,
         ITableRepository tableRepository,
         ICurrentUserService currentUserService,
-        IOrderNotificationService notificationService)
+        IOrderNotificationService notificationService,
+        IBenefitHubClient benefitHubClient,
+        IConfiguration configuration,
+        IWebhookService webhookService,
+        ILogger<OrderService> logger)
     {
         _orderRepository = orderRepository;
         _productRepository = productRepository;
         _tableRepository = tableRepository;
         _currentUserService = currentUserService;
         _notificationService = notificationService;
+        _benefitHubClient = benefitHubClient;
+        _configuration = configuration;
+        _webhookService = webhookService;
+        _logger = logger;
     }
 
     public async Task<Result<OrderDto>> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
@@ -143,6 +157,14 @@ public class OrderService : IOrderService
         // Notify real-time clients
         await _notificationService.NotifyOrderCreatedAsync(tenantId, dto, cancellationToken);
 
+        // Dispatch webhook event — fire and forget
+        await _webhookService.DispatchEventAsync(tenantId.ToString(), "order.created", new
+        {
+            orderId = dto.Id,
+            orderNumber = dto.OrderNumber,
+            total = dto.Total
+        });
+
         return Result<OrderDto>.Success(dto);
     }
 
@@ -172,12 +194,49 @@ public class OrderService : IOrderService
             }
         }
 
+        // BenefitHub: revertir beneficios si el pedido estaba pagado y se cancela (no critico)
+        if (request.Status == OrderStatus.Cancelled && order.PaymentStatus == PaymentStatus.Paid)
+        {
+            try
+            {
+                await _benefitHubClient.ReverseAsync(
+                    order.Id.ToString(),
+                    _configuration["BenefitHub:TenantSourceId"] ?? "",
+                    "Pedido cancelado");
+
+                _logger.LogInformation(
+                    "BenefitHub: beneficios revertidos para pedido cancelado {OrderNumber}", order.OrderNumber);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "BenefitHub reverse fallo para pedido {OrderNumber}", order.OrderNumber);
+            }
+        }
+
         var updated = await _orderRepository.UpdateAsync(order, cancellationToken);
         var dto = updated.ToDto();
 
         // Notify real-time clients
         var tenantId = _currentUserService.TenantId ?? Guid.Empty;
         await _notificationService.NotifyOrderStatusChangedAsync(tenantId, dto, cancellationToken);
+
+        // Dispatch webhook events — fire and forget
+        if (request.Status == OrderStatus.Completed)
+        {
+            await _webhookService.DispatchEventAsync(tenantId.ToString(), "order.completed", new
+            {
+                orderId = dto.Id,
+                orderNumber = dto.OrderNumber,
+                total = dto.Total
+            });
+        }
+        else if (request.Status == OrderStatus.Ready)
+        {
+            await _webhookService.DispatchEventAsync(tenantId.ToString(), "order.ready", new
+            {
+                orderId = dto.Id
+            });
+        }
 
         return Result<OrderDto>.Success(dto);
     }
@@ -212,6 +271,12 @@ public class OrderService : IOrderService
         if (order.Status == OrderStatus.Ready)
         {
             await _notificationService.NotifyOrderStatusChangedAsync(tenantId, dto, cancellationToken);
+
+            // Dispatch webhook event — fire and forget
+            await _webhookService.DispatchEventAsync(tenantId.ToString(), "order.ready", new
+            {
+                orderId = dto.Id
+            });
         }
 
         return Result<OrderDto>.Success(dto);

@@ -124,6 +124,35 @@ public interface IReportRepository
     /// </summary>
     Task<(int pending, int inProgress, int ready)> GetOrderStatusCountsAsync(Guid tenantId, CancellationToken cancellationToken = default);
     
+    // ========== AGGREGATED QUERIES (Frontend) ==========
+
+    /// <summary>
+    /// Obtiene ventas diarias con desglose de impuestos y descuentos
+    /// </summary>
+    Task<List<(DateTime date, decimal subtotal, decimal tax, decimal discount, decimal total, int invoiceCount, int orderCount)>> GetDailySalesDetailedAsync(
+        DateTime from,
+        DateTime to,
+        Guid tenantId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Obtiene totales de impuestos y descuentos en un periodo
+    /// </summary>
+    Task<(decimal totalTax, decimal totalDiscount)> GetTaxAndDiscountTotalsAsync(
+        DateTime from,
+        DateTime to,
+        Guid tenantId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Obtiene ventas agrupadas por dia de la semana
+    /// </summary>
+    Task<List<(int dayOfWeek, int invoiceCount, decimal totalSales)>> GetSalesByDayOfWeekAsync(
+        DateTime from,
+        DateTime to,
+        Guid tenantId,
+        CancellationToken cancellationToken = default);
+
     // ========== CONTROL QUERIES ==========
     
     /// <summary>

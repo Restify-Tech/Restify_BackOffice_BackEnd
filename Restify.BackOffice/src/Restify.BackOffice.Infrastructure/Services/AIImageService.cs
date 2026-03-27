@@ -22,6 +22,14 @@ public class AIImageService : IAIImageService
     private readonly IConfiguration _configuration;
     private readonly ILogger<AIImageService> _logger;
 
+    private const string VisualCreativeClientName = "VisualCreative";
+    private const string ConfigKeyBaseUrl = "VisualCreative:BaseUrl";
+    private const string ConfigKeyTier = "VisualCreative:DefaultTier";
+    private const string ConfigKeyCountry = "VisualCreative:DefaultCountry";
+    private const string ConfigKeyCuisine = "VisualCreative:DefaultCuisine";
+    private const string DefaultBaseUrl = "http://localhost:5600";
+    private const string GenerateEndpoint = "/api/visual/generate";
+
     public AIImageService(
         IAIImageGenerationRepository generationRepository,
         IAIImagePromptTemplateRepository templateRepository,
@@ -42,133 +50,95 @@ public class AIImageService : IAIImageService
 
     public async Task<Result<AIImageGenerationDto>> GenerateImageAsync(GenerateImageRequest request, CancellationToken cancellationToken = default)
     {
-        // Validate product exists
         var product = await _productRepository.GetByIdAsync(request.ProductId, cancellationToken);
         if (product == null)
             return Result<AIImageGenerationDto>.Failure("Producto no encontrado");
 
-        // Build the final prompt
-        string finalPrompt;
-        AIImagePromptTemplate? template = null;
+        var finalPrompt = await BuildPromptAsync(request, product, cancellationToken);
 
-        if (!string.IsNullOrWhiteSpace(request.CustomPrompt))
-        {
-            finalPrompt = request.CustomPrompt;
-        }
-        else if (request.PromptTemplateId.HasValue)
-        {
-            template = await _templateRepository.GetByIdAsync(request.PromptTemplateId.Value, cancellationToken);
-            if (template == null)
-                return Result<AIImageGenerationDto>.Failure("Plantilla de prompt no encontrada");
-
-            finalPrompt = template.PromptTemplate
-                .Replace("{product_name}", product.Name)
-                .Replace("{product_description}", product.Description ?? product.Name);
-        }
-        else
-        {
-            // Use default template or fallback
-            template = await _templateRepository.GetDefaultAsync(cancellationToken);
-            if (template != null)
-            {
-                finalPrompt = template.PromptTemplate
-                    .Replace("{product_name}", product.Name)
-                    .Replace("{product_description}", product.Description ?? product.Name);
-            }
-            else
-            {
-                finalPrompt = $"A professional food photography shot of {product.Name}. " +
-                    $"{product.Description ?? ""}. " +
-                    "Beautiful plating, restaurant quality, natural lighting, appetizing presentation, " +
-                    "high resolution, 4K quality, food styling.";
-            }
-        }
-
-        // Create generation record
         var tenantId = _currentUserService.TenantId ?? Guid.Empty;
         var generation = new AIImageGeneration
         {
             TenantId = tenantId,
             ProductId = request.ProductId,
-            PromptTemplateId = template?.Id,
+            PromptTemplateId = request.PromptTemplateId.HasValue
+                ? (await _templateRepository.GetByIdAsync(request.PromptTemplateId.Value, cancellationToken))?.Id
+                : null,
             FinalPrompt = finalPrompt,
             Status = AIImageGenerationStatus.Generating,
-            ProviderUsed = "dall-e-3"
+            ProviderUsed = "visual-creative"
         };
 
         generation = await _generationRepository.CreateAsync(generation, cancellationToken);
 
         try
         {
-            // Call DALL-E 3 API
-            var apiKey = _configuration["OpenAI:ApiKey"];
-            if (string.IsNullOrEmpty(apiKey))
-            {
-                generation.Status = AIImageGenerationStatus.Failed;
-                generation.ErrorMessage = "API key de OpenAI no configurada";
-                await _generationRepository.UpdateAsync(generation, cancellationToken);
-                return Result<AIImageGenerationDto>.Failure("API key de OpenAI no configurada. Configure 'OpenAI:ApiKey' en appsettings.");
-            }
+            var client = _httpClientFactory.CreateClient(VisualCreativeClientName);
+            var tier = _configuration[ConfigKeyTier] ?? "Free";
+            var country = _configuration[ConfigKeyCountry] ?? "EC";
+            var cuisine = _configuration[ConfigKeyCuisine] ?? "Ecuatoriana";
 
-            var client = _httpClientFactory.CreateClient("OpenAI");
-            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
-
-            var dalleRequest = new
+            var visualRequest = new
             {
-                model = "dall-e-3",
-                prompt = finalPrompt,
-                n = 1,
-                size = "1024x1024",
-                quality = "standard",
-                response_format = "url"
+                rawPrompt = finalPrompt,
+                context = "Restaurant",
+                country,
+                cuisine,
+                tier,
+                referenceImageUrl = request.ReferenceImageUrl
             };
 
-            var response = await client.PostAsJsonAsync("https://api.openai.com/v1/images/generations", dalleRequest, cancellationToken);
+            _logger.LogInformation("Enviando solicitud a VisualCreative para producto {ProductId}: {Prompt}",
+                product.Id, finalPrompt);
+
+            var response = await client.PostAsJsonAsync(GenerateEndpoint, visualRequest, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                _logger.LogError("DALL-E API error: {StatusCode} - {Error}", response.StatusCode, errorContent);
+                _logger.LogError("VisualCreative API error: {StatusCode} - {Error}", response.StatusCode, errorContent);
 
                 generation.Status = AIImageGenerationStatus.Failed;
-                generation.ErrorMessage = $"Error de API: {response.StatusCode}";
+                generation.ErrorMessage = $"Error de VisualCreative API: {response.StatusCode}";
                 await _generationRepository.UpdateAsync(generation, cancellationToken);
 
                 return Result<AIImageGenerationDto>.Failure($"Error al generar imagen: {response.StatusCode}");
             }
 
-            var dalleResponse = await response.Content.ReadFromJsonAsync<DallEResponse>(cancellationToken: cancellationToken);
-            var imageUrl = dalleResponse?.Data?.FirstOrDefault()?.Url;
+            var visualResponse = await response.Content.ReadFromJsonAsync<VisualCreativeResponse>(
+                cancellationToken: cancellationToken);
 
-            if (string.IsNullOrEmpty(imageUrl))
+            if (visualResponse == null || string.IsNullOrEmpty(visualResponse.ImageBase64))
             {
                 generation.Status = AIImageGenerationStatus.Failed;
-                generation.ErrorMessage = "No se recibió URL de imagen en la respuesta";
+                generation.ErrorMessage = "No se recibio imagen en la respuesta de VisualCreative";
                 await _generationRepository.UpdateAsync(generation, cancellationToken);
 
-                return Result<AIImageGenerationDto>.Failure("No se recibió imagen de la API");
+                return Result<AIImageGenerationDto>.Failure("No se recibio imagen de VisualCreative");
             }
 
-            // Update generation record
-            generation.GeneratedImageUrl = imageUrl;
+            var imageDataUrl = $"data:{visualResponse.ContentType};base64,{visualResponse.ImageBase64}";
+
+            generation.GeneratedImageUrl = imageDataUrl;
             generation.Status = AIImageGenerationStatus.Completed;
-            generation.CostUsd = 0.04m; // Standard DALL-E 3 1024x1024 price
+            generation.ProviderUsed = visualResponse.ProviderUsed ?? "visual-creative";
+            generation.CostUsd = tier == "Premium" ? 0.04m : 0m;
             await _generationRepository.UpdateAsync(generation, cancellationToken);
 
-            // Update product image
-            product.ImageUrl = imageUrl;
+            product.ImageUrl = imageDataUrl;
             await _productRepository.UpdateAsync(product, cancellationToken);
 
-            _logger.LogInformation("Image generated successfully for product {ProductId}, generation {GenerationId}", product.Id, generation.Id);
+            _logger.LogInformation(
+                "Imagen generada via VisualCreative para producto {ProductId} (prompt: {PromptProvider}, imagen: {ImageProvider})",
+                product.Id, visualResponse.PromptProviderUsed, visualResponse.ProviderUsed);
 
-            // Reload with navigation properties
             generation = await _generationRepository.GetByIdAsync(generation.Id, cancellationToken);
 
             return Result<AIImageGenerationDto>.Success(generation!.ToDto());
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error generating image for product {ProductId}", request.ProductId);
+            _logger.LogError(ex, "Error generando imagen via VisualCreative para producto {ProductId}", request.ProductId);
 
             generation.Status = AIImageGenerationStatus.Failed;
             generation.ErrorMessage = ex.Message;
@@ -198,20 +168,41 @@ public class AIImageService : IAIImageService
 
         return Result<IEnumerable<AIImageGenerationDto>>.Success(dtos);
     }
+
+    private async Task<string> BuildPromptAsync(GenerateImageRequest request, Product product, CancellationToken ct)
+    {
+        if (!string.IsNullOrWhiteSpace(request.CustomPrompt))
+            return request.CustomPrompt;
+
+        AIImagePromptTemplate? template = null;
+
+        if (request.PromptTemplateId.HasValue)
+            template = await _templateRepository.GetByIdAsync(request.PromptTemplateId.Value, ct);
+
+        template ??= await _templateRepository.GetDefaultAsync(ct);
+
+        if (template != null)
+        {
+            return template.PromptTemplate
+                .Replace("{product_name}", product.Name)
+                .Replace("{product_description}", product.Description ?? product.Name);
+        }
+
+        return $"{product.Name}. {product.Description ?? ""}";
+    }
 }
 
-// Internal DTOs for DALL-E API response
-internal class DallEResponse
+internal class VisualCreativeResponse
 {
-    [JsonPropertyName("data")]
-    public List<DallEImageData>? Data { get; set; }
-}
+    [JsonPropertyName("imageBase64")]
+    public string? ImageBase64 { get; set; }
 
-internal class DallEImageData
-{
-    [JsonPropertyName("url")]
-    public string? Url { get; set; }
+    [JsonPropertyName("contentType")]
+    public string? ContentType { get; set; }
 
-    [JsonPropertyName("revised_prompt")]
-    public string? RevisedPrompt { get; set; }
+    [JsonPropertyName("providerUsed")]
+    public string? ProviderUsed { get; set; }
+
+    [JsonPropertyName("promptProviderUsed")]
+    public string? PromptProviderUsed { get; set; }
 }

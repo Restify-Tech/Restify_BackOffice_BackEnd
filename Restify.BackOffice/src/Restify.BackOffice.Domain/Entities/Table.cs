@@ -34,6 +34,10 @@ public class Table : TenantEntity
     public Guid? CurrentOrderId { get; set; }
     public string? CurrentCustomerName { get; set; }
     public DateTime? OccupiedSince { get; set; }
+
+    // Sucursal
+    public Guid? BranchId { get; set; }
+    public Branch? Branch { get; set; }
 }
 
 /// <summary>
