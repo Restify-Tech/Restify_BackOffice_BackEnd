@@ -37,6 +37,9 @@ public class AppDbContext : DbContext
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<ScreenPermission> ScreenPermissions => Set<ScreenPermission>();
     public DbSet<DeliveryZone> DeliveryZones => Set<DeliveryZone>();
+    public DbSet<GeneralValue> GeneralValues => Set<GeneralValue>();
+    public DbSet<Plan> Plans => Set<Plan>();
+    public DbSet<PlanScreenPermission> PlanScreenPermissions => Set<PlanScreenPermission>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

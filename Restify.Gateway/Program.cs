@@ -9,9 +9,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
 
-// JWT Authentication
+// Validar JWT SecretKey al iniciar
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey not configured");
+var secretKey = jwtSettings["SecretKey"];
+if (string.IsNullOrEmpty(secretKey) || secretKey.Length < 32)
+    throw new InvalidOperationException("JwtSettings:SecretKey debe tener al menos 32 caracteres. Proveer via variable de entorno JwtSettings__SecretKey");
 
 builder.Services.AddAuthentication(options =>
 {
@@ -68,21 +70,19 @@ builder.Services.AddRateLimiter(options =>
     options.RejectionStatusCode = 429;
 });
 
-// CORS
+// Configurar CORS con whitelist desde configuracion
 builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowAll", policy =>
-    {
-        policy.SetIsOriginAllowed(_ => true)
-              .AllowAnyMethod()
+    options.AddDefaultPolicy(policy =>
+        policy.WithOrigins(
+            builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+                ?? ["http://localhost:3000"])
               .AllowAnyHeader()
-              .AllowCredentials();
-    });
-});
+              .AllowAnyMethod()
+              .AllowCredentials()));
 
 var app = builder.Build();
 
-app.UseCors("AllowAll");
+app.UseCors();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();

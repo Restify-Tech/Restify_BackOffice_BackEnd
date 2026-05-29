@@ -17,12 +17,13 @@ public class ValidatorTests
     private readonly LoginRequestValidator _loginValidator = new();
 
     [Fact]
-    public void LoginRequest_EmailVacio_Falla()
+    public void LoginRequest_EmailVacio_SinUsername_Falla()
     {
+        // Ni email ni username → error a nivel raiz
         var request = new LoginRequest("", null, "Admin123!");
         var result = _loginValidator.TestValidate(request);
-        result.ShouldHaveValidationErrorFor(x => x.Email)
-            .WithErrorMessage("El email es requerido");
+        result.ShouldHaveValidationErrorFor(x => x)
+            .WithErrorMessage("Debe proporcionar un email o nombre de usuario");
     }
 
     [Fact]
@@ -324,12 +325,12 @@ public class ValidatorTests
     // ===== Parameterized tests =====
 
     [Theory]
-    [InlineData("")]
     [InlineData("invalid")]
     [InlineData("@missing-local")]
     [InlineData("missing-domain@")]
     public void LoginRequest_EmailsInvalidos_Fallan(string email)
     {
+        // Email con formato incorrecto (no vacio) → error en propiedad Email
         var request = new LoginRequest(email, null, "Admin123!");
         var result = _loginValidator.TestValidate(request);
         result.ShouldHaveValidationErrorFor(x => x.Email);

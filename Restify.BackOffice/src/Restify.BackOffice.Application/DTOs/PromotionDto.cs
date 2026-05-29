@@ -49,3 +49,49 @@ public record LowStockAlertDto(
 public record UpdateMinStockRequest(
     decimal MinStockLevel
 );
+
+// ──── Calculate Promotions (sin orden creada) ────
+
+public record CalculatePromotionsRequest(
+    List<CalculationItemRequest> Items
+);
+
+public record CalculationItemRequest(
+    Guid ProductId,
+    int Quantity,
+    decimal UnitPrice
+);
+
+public record CalculatePromotionsResponse(
+    List<AppliedPromotionDto> AppliedPromotions,
+    decimal TotalDiscount
+);
+
+public record AppliedPromotionDto(
+    Guid PromotionId,
+    string Name,
+    string Type,
+    decimal DiscountAmount,
+    string? Description
+);
+
+// ──── Upsell Suggestions ────
+
+public record UpsellSuggestionDto(
+    Guid ProductId,
+    string ProductName,
+    string? ProductImage,
+    decimal Price,
+    string CategoryName,
+    string Reason
+);
+
+// ──── Table Customer Profile ────
+
+public record TableCustomerProfileDto(
+    Guid CustomerId,
+    string CustomerName,
+    string? PhoneNumber,
+    string? Email,
+    int TotalOrders
+);

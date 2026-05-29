@@ -235,6 +235,57 @@ public class ShiftService : IShiftService
         return Result<IEnumerable<ShiftAssignmentDto>>.Success(dtos);
     }
 
+    public async Task<Result<CurrentShiftDto?>> GetMyCurrentShiftAsync(CancellationToken cancellationToken = default)
+    {
+        var userId = _currentUserService.UserId;
+        if (userId is null) return Result<CurrentShiftDto?>.Success(null);
+
+        var today = DateTime.UtcNow.Date;
+        var assignment = await _context.ShiftAssignments
+            .Include(a => a.ShiftTemplate)
+            .Where(a => a.EmployeeId == userId.Value
+                     && a.Date.Date == today
+                     && (a.Status == ShiftStatus.Present || a.Status == ShiftStatus.Late))
+            .OrderByDescending(a => a.ActualClockIn)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (assignment is null) return Result<CurrentShiftDto?>.Success(null);
+
+        var dto = new CurrentShiftDto(
+            assignment.Id,
+            assignment.Date,
+            assignment.ActualClockIn,
+            assignment.ActualClockOut,
+            assignment.Status.ToString(),
+            assignment.ShiftTemplate?.Name,
+            assignment.ScheduledStart?.ToString(@"hh\:mm"),
+            assignment.ScheduledEnd?.ToString(@"hh\:mm")
+        );
+        return Result<CurrentShiftDto?>.Success(dto);
+    }
+
+    public async Task<Result<IEnumerable<ActiveShiftDto>>> GetActiveShiftsAsync(CancellationToken cancellationToken = default)
+    {
+        var today = DateTime.UtcNow.Date;
+        var assignments = await _context.ShiftAssignments
+            .Include(a => a.ShiftTemplate)
+            .Include(a => a.Employee)
+            .Where(a => a.Date.Date == today
+                     && (a.Status == ShiftStatus.Present || a.Status == ShiftStatus.Late))
+            .OrderBy(a => a.ActualClockIn)
+            .ToListAsync(cancellationToken);
+
+        var dtos = assignments.Select(a => new ActiveShiftDto(
+            a.Id,
+            a.EmployeeId,
+            a.Employee != null ? $"{a.Employee.FirstName} {a.Employee.LastName}".Trim() : "Empleado",
+            a.ActualClockIn ?? a.Date,
+            a.Status.ToString(),
+            a.ShiftTemplate?.Name
+        ));
+        return Result<IEnumerable<ActiveShiftDto>>.Success(dtos);
+    }
+
     // ===== Helpers =====
 
     private static ShiftTemplateDto ToTemplateDto(ShiftTemplate t)

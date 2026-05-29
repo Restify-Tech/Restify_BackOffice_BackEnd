@@ -38,11 +38,17 @@ public class DbSeeder(
             // Sembrar pantallas-permisos
             await SeedScreenPermissionsAsync();
 
+            // Sembrar planes de suscripción
+            await SeedPlansAsync();
+
             // Sembrar tenant de demostración
             await SeedDemoTenantAsync();
 
             // Sembrar SuperAdmin
             await SeedSuperAdminAsync();
+
+            // Sembrar GeneralValues (configuracion global)
+            await SeedGeneralValuesAsync();
 
             await _context.SaveChangesAsync();
 
@@ -560,7 +566,7 @@ public class DbSeeder(
             RoleId = adminRole.Id
         });
 
-        _logger.LogInformation("Tenant demo creado con usuario admin@demo.com / Admin123!");
+        _logger.LogInformation("Tenant demo inicializado con usuario: admin@demo.com");
     }
 
     private async Task SeedSuperAdminAsync()
@@ -635,6 +641,173 @@ public class DbSeeder(
             RoleId = superAdminRole.Id
         });
 
-        _logger.LogInformation("SuperAdmin creado: superadmin@restosaas.com / SuperAdmin123!");
+        _logger.LogInformation("SuperAdmin inicializado: superadmin@restosaas.com");
+    }
+
+    /// <summary>
+    /// Siembra los planes de suscripcion base. Idempotente.
+    /// </summary>
+    private async Task SeedPlansAsync()
+    {
+        if (await _context.Plans.AnyAsync())
+            return;
+
+        // Pantallas del plan Basico
+        var basicScreens = new List<string>
+        {
+            "dashboard", "orders.list", "orders.new", "kitchen", "billing.list", "billing.new", "tables"
+        };
+
+        // Pantallas del plan Pro (todo el basico + mas)
+        var proScreens = new List<string>(basicScreens)
+        {
+            "delivery.drivers", "delivery.cooperatives", "delivery.tracking",
+            "reports", "menu.categories", "menu.products", "menu.modifiers",
+            "inventory", "suppliers", "purchase-orders", "qr-codes", "dispatch",
+            "customers"
+        };
+
+        // Pantallas del plan Enterprise (todo lo disponible)
+        var enterpriseScreens = new List<string>(proScreens)
+        {
+            "users", "roles", "settings", "ai.templates"
+        };
+
+        var basicPlan = new Domain.Entities.Plan
+        {
+            Name = "Básico",
+            Description = "Plan ideal para restaurantes pequeños. Incluye módulos esenciales de operación.",
+            MonthlyPrice = 49m,
+            AnnualPrice = 470m,
+            MaxUsers = 3,
+            MaxBranches = 1,
+            IsActive = true,
+            IsDefault = true,
+            DisplayOrder = 1,
+            Color = "#4CAF50"
+        };
+
+        foreach (var code in basicScreens)
+            basicPlan.PlanScreenPermissions.Add(new Domain.Entities.PlanScreenPermission { ScreenCode = code, IsIncluded = true });
+
+        var proPlan = new Domain.Entities.Plan
+        {
+            Name = "Pro",
+            Description = "Plan completo para restaurantes en crecimiento. Delivery, reportes, inventario y más.",
+            MonthlyPrice = 99m,
+            AnnualPrice = 950m,
+            MaxUsers = 10,
+            MaxBranches = 3,
+            IsActive = true,
+            IsDefault = false,
+            DisplayOrder = 2,
+            Color = "#C8963E"
+        };
+
+        foreach (var code in proScreens)
+            proPlan.PlanScreenPermissions.Add(new Domain.Entities.PlanScreenPermission { ScreenCode = code, IsIncluded = true });
+
+        var enterprisePlan = new Domain.Entities.Plan
+        {
+            Name = "Enterprise",
+            Description = "Plan sin límites para cadenas y franquicias. Usuarios ilimitados, sucursales ilimitadas, IA.",
+            MonthlyPrice = 199m,
+            AnnualPrice = 1910m,
+            MaxUsers = 0,
+            MaxBranches = 0,
+            IsActive = true,
+            IsDefault = false,
+            DisplayOrder = 3,
+            Color = "#9C27B0"
+        };
+
+        foreach (var code in enterpriseScreens)
+            enterprisePlan.PlanScreenPermissions.Add(new Domain.Entities.PlanScreenPermission { ScreenCode = code, IsIncluded = true });
+
+        await _context.Plans.AddRangeAsync(basicPlan, proPlan, enterprisePlan);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Planes de suscripción creados: Básico, Pro, Enterprise");
+    }
+
+    /// <summary>
+    /// Siembra los parametros de configuracion global del sistema (GeneralValues).
+    /// Idempotente: solo agrega claves que no existan aun.
+    /// </summary>
+    private async Task SeedGeneralValuesAsync()
+    {
+        var existingKeys = await _context.GeneralValues
+            .Select(v => v.Key)
+            .ToListAsync();
+
+        if (existingKeys.Count > 0)
+        {
+            _logger.LogInformation("GeneralValues ya sembrados ({Count} existentes), omitiendo", existingKeys.Count);
+            return;
+        }
+
+        // Categorias raiz (agrupadores)
+        var configParent = GeneralValue.Create("CONFIG", "Configuracion General", null, GeneralValueType.String, "CONFIG",
+            "Parametros globales de la aplicacion", null, false, 1);
+        var securityParent = GeneralValue.Create("SECURITY", "Seguridad", null, GeneralValueType.String, "SECURITY",
+            "Parametros de seguridad y autenticacion", null, false, 2);
+        var limitsParent = GeneralValue.Create("LIMITS", "Limites del Sistema", null, GeneralValueType.String, "LIMITS",
+            "Limites numericos y cuotas de uso", null, false, 3);
+
+        await _context.GeneralValues.AddRangeAsync(configParent, securityParent, limitsParent);
+        await _context.SaveChangesAsync();
+
+        // Hijos de CONFIG
+        var configValues = new[]
+        {
+            GeneralValue.Create("CONFIG/MAX_LOGIN_ATTEMPTS", "Intentos Maximos de Login", "5",
+                GeneralValueType.Number, "CONFIG", "Cantidad de intentos fallidos antes de bloquear la cuenta",
+                configParent.Id, true, 1),
+            GeneralValue.Create("CONFIG/MAINTENANCE_MODE", "Modo Mantenimiento", "false",
+                GeneralValueType.Boolean, "CONFIG", "Si es true, bloquea acceso a usuarios no administradores",
+                configParent.Id, true, 2),
+            GeneralValue.Create("CONFIG/SUPPORT_EMAIL", "Email de Soporte", "soporte@restify.com",
+                GeneralValueType.String, "CONFIG", "Correo de contacto mostrado en errores y footer",
+                configParent.Id, true, 3),
+        };
+
+        // Hijos de SECURITY
+        var securityValues = new[]
+        {
+            GeneralValue.Create("SECURITY/JWT_ACCESS_EXPIRY_MINUTES", "Expiracion Access Token (min)", "60",
+                GeneralValueType.Number, "SECURITY", "Tiempo de vida del access token JWT en minutos",
+                securityParent.Id, true, 1),
+            GeneralValue.Create("SECURITY/JWT_REFRESH_EXPIRY_DAYS", "Expiracion Refresh Token (dias)", "7",
+                GeneralValueType.Number, "SECURITY", "Tiempo de vida del refresh token JWT en dias",
+                securityParent.Id, true, 2),
+            GeneralValue.Create("SECURITY/BCRYPT_WORK_FACTOR", "Factor de Trabajo BCrypt", "12",
+                GeneralValueType.Number, "SECURITY", "Factor de costo de hashing. Minimo 12 segun politica de seguridad",
+                securityParent.Id, false, 3),
+            GeneralValue.Create("SECURITY/MAX_FAILED_LOGIN_ATTEMPTS", "Intentos Fallidos Maximos", "5",
+                GeneralValueType.Number, "SECURITY", "Numero de intentos fallidos antes de bloquear la cuenta",
+                securityParent.Id, true, 4),
+            GeneralValue.Create("SECURITY/LOCKOUT_DURATION_MINUTES", "Duracion Bloqueo (min)", "30",
+                GeneralValueType.Number, "SECURITY", "Duracion del bloqueo de cuenta tras intentos fallidos",
+                securityParent.Id, true, 5),
+        };
+
+        // Hijos de LIMITS
+        var limitsValues = new[]
+        {
+            GeneralValue.Create("LIMITS/MAX_PAGINATION_SIZE", "Tamano Maximo de Pagina", "100",
+                GeneralValueType.Number, "LIMITS", "Maximo de registros por pagina en listados",
+                limitsParent.Id, true, 1),
+            GeneralValue.Create("LIMITS/DEFAULT_PAGE_SIZE", "Tamano de Pagina por Defecto", "20",
+                GeneralValueType.Number, "LIMITS", "Registros por defecto si no se especifica paginacion",
+                limitsParent.Id, true, 2),
+        };
+
+        await _context.GeneralValues.AddRangeAsync(configValues);
+        await _context.GeneralValues.AddRangeAsync(securityValues);
+        await _context.GeneralValues.AddRangeAsync(limitsValues);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("GeneralValues sembrados: {Count} registros",
+            3 + configValues.Length + securityValues.Length + limitsValues.Length);
     }
 }

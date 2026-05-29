@@ -157,6 +157,64 @@ public class ReportsController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    /// GET /api/reports/insights
+    /// Insights automaticos basados en los datos del dia actual.
+    /// </summary>
+    [HttpGet("insights")]
+    public async Task<IActionResult> GetInsights(CancellationToken cancellationToken = default)
+    {
+        var tenantId = _currentUserService.TenantId;
+        if (!tenantId.HasValue)
+            return Unauthorized();
+
+        try
+        {
+            var result = await _reportService.GetInsightsAsync(tenantId.Value, cancellationToken);
+
+            if (!result.IsSuccess)
+                return BadRequest(result);
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error obteniendo insights del dia");
+            return StatusCode(500, Result<object>.Failure("Error interno del servidor"));
+        }
+    }
+
+    /// <summary>
+    /// GET /api/reports/my-ranking
+    /// Ranking del mesero autenticado vs sus companeros en el dia actual.
+    /// </summary>
+    [HttpGet("my-ranking")]
+    public async Task<IActionResult> GetMyRanking(CancellationToken cancellationToken = default)
+    {
+        var tenantId = _currentUserService.TenantId;
+        if (!tenantId.HasValue)
+            return Unauthorized();
+
+        var identifier = _currentUserService.Email;
+        if (string.IsNullOrEmpty(identifier))
+            return Unauthorized();
+
+        try
+        {
+            var result = await _reportService.GetMyRankingAsync(tenantId.Value, identifier, cancellationToken);
+
+            if (!result.IsSuccess)
+                return BadRequest(result);
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error obteniendo ranking del mesero");
+            return StatusCode(500, Result<object>.Failure("Error interno del servidor"));
+        }
+    }
+
     // ========== HELPERS ==========
 
     private static bool TryParseDateRange(string dateFrom, string dateTo, out DateTime from, out DateTime to)

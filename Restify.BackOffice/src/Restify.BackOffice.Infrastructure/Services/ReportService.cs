@@ -384,6 +384,122 @@ public class ReportService : IReportService
         }
     }
 
+    // ========== INSIGHTS / RANKING ==========
+
+    public async Task<Result<IEnumerable<InsightDto>>> GetInsightsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var insights = new List<InsightDto>();
+
+            // Insight 1: comparacion de ventas hoy vs ayer
+            var (todaySales, _) = await _reportRepository
+                .GetTodayOrderTotalsAsync(tenantId, cancellationToken);
+            var (yesterdaySales, _) = await _reportRepository
+                .GetYesterdayOrderTotalsAsync(tenantId, cancellationToken);
+
+            if (yesterdaySales > 0)
+            {
+                var diff = ((todaySales - yesterdaySales) / yesterdaySales) * 100;
+                if (diff > 10)
+                    insights.Add(new InsightDto(
+                        "sales-up",
+                        "positive",
+                        $"Ventas {diff:F0}% por encima del dia anterior",
+                        null
+                    ));
+                else if (diff < -10)
+                    insights.Add(new InsightDto(
+                        "sales-down",
+                        "warning",
+                        $"Ventas {Math.Abs(diff):F0}% por debajo del dia anterior",
+                        "Ver reportes"
+                    ));
+            }
+
+            // Insight 2: pedidos con mas de 90 minutos sin cerrar
+            var longRunning = await _reportRepository
+                .GetLongRunningOrdersCountAsync(tenantId, 90, cancellationToken);
+
+            if (longRunning > 0)
+                insights.Add(new InsightDto(
+                    "long-tables",
+                    "warning",
+                    $"{longRunning} pedido(s) con mas de 90 minutos sin cerrar",
+                    null
+                ));
+
+            // Insight 3: producto mas pedido hoy
+            var topProduct = await _reportRepository
+                .GetTopProductTodayAsync(tenantId, cancellationToken);
+
+            if (topProduct.HasValue)
+                insights.Add(new InsightDto(
+                    "top-product",
+                    "info",
+                    $"Producto mas pedido hoy: {topProduct.Value.productName} ({topProduct.Value.quantity} unidades)",
+                    null
+                ));
+
+            return Result<IEnumerable<InsightDto>>.Success(insights);
+        }
+        catch (Exception)
+        {
+            return Result<IEnumerable<InsightDto>>.Failure("Error al obtener insights del dia");
+        }
+    }
+
+    public async Task<Result<WaiterRankingDto>> GetMyRankingAsync(
+        Guid tenantId,
+        string currentUserIdentifier,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var ranking = await _reportRepository
+                .GetWaiterRankingTodayAsync(tenantId, cancellationToken);
+
+            var totalWaiters = ranking.Count;
+
+            if (totalWaiters == 0)
+                return Result<WaiterRankingDto>.Success(
+                    new WaiterRankingDto(1, 1, 0, 0m, "USD", null));
+
+            // Buscar al mesero actual por coincidencia de TakenBy con el identificador del usuario
+            var myEntry = ranking.FirstOrDefault(r =>
+                r.takenBy.Equals(currentUserIdentifier, StringComparison.OrdinalIgnoreCase));
+
+            if (myEntry == default)
+                return Result<WaiterRankingDto>.Success(
+                    new WaiterRankingDto(totalWaiters + 1, totalWaiters, 0, 0m, "USD", null));
+
+            var position = ranking.IndexOf(myEntry) + 1;
+
+            var badge = position switch
+            {
+                1 => "top1",
+                <= 3 => "top3",
+                <= 5 => "top5",
+                _ => (string?)null
+            };
+
+            return Result<WaiterRankingDto>.Success(new WaiterRankingDto(
+                position,
+                totalWaiters,
+                myEntry.orders,
+                myEntry.sales,
+                "USD",
+                badge
+            ));
+        }
+        catch (Exception)
+        {
+            return Result<WaiterRankingDto>.Failure("Error al obtener el ranking del mesero");
+        }
+    }
+
     // ========== CSV GENERATION HELPERS ==========
 
     private async Task<string> GenerateSalesCsvAsync(DateTime from, DateTime to, Guid tenantId, CancellationToken cancellationToken)

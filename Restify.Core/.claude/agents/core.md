@@ -1,6 +1,8 @@
 ---
 name: core
 description: Especialista en el servicio Core - grids, tablas generales, configuraciones parametricas
+model: sonnet
+maxTurns: 30
 ---
 
 # Agente Core — Configuraciones y Parametros

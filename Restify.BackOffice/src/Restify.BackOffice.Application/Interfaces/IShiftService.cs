@@ -39,4 +39,14 @@ public interface IShiftService
     /// Obtiene los turnos de un empleado en un rango de fechas
     /// </summary>
     Task<Result<IEnumerable<ShiftAssignmentDto>>> GetEmployeeShiftsAsync(Guid employeeId, DateTime? from, DateTime? to, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Obtiene el turno activo del usuario autenticado en el dia de hoy
+    /// </summary>
+    Task<Result<CurrentShiftDto?>> GetMyCurrentShiftAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Obtiene todos los turnos activos del branch actual (para gerentes)
+    /// </summary>
+    Task<Result<IEnumerable<ActiveShiftDto>>> GetActiveShiftsAsync(CancellationToken cancellationToken = default);
 }

@@ -168,6 +168,10 @@ public class Tenant : AuditableEntity
     /// </summary>
     public string? FontBody { get; set; }
 
+    /// <summary>Plan de suscripción asignado</summary>
+    public Guid? PlanId { get; set; }
+    public virtual Plan? Plan { get; set; }
+
     // Navegación
     public virtual ICollection<User> Users { get; set; } = new List<User>();
     public virtual ICollection<Role> Roles { get; set; } = new List<Role>();

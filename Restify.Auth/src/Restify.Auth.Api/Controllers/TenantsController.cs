@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Restify.Auth.Application.DTOs.Common;
+using Restify.Auth.Application.DTOs.Plans;
 using Restify.Auth.Application.DTOs.Tenant;
 using Restify.Auth.Application.Interfaces;
 
@@ -12,12 +14,35 @@ namespace Restify.Auth.Api.Controllers;
 public class TenantsController : ControllerBase
 {
     private readonly ITenantManagementService _service;
+    private readonly IPlanService _planService;
     private readonly ICurrentUserService _currentUser;
+    private readonly ILogger<TenantsController> _logger;
 
-    public TenantsController(ITenantManagementService service, ICurrentUserService currentUser)
+    public TenantsController(ITenantManagementService service, IPlanService planService, ICurrentUserService currentUser, ILogger<TenantsController> logger)
     {
         _service = service;
+        _planService = planService;
         _currentUser = currentUser;
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Obtiene la lista de restaurantes activos (endpoint publico para seleccion en login).
+    /// </summary>
+    [HttpGet("active")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetActiveTenants(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _service.GetActivePublicAsync(cancellationToken);
+            return result.IsSuccess ? Ok(result.Data) : BadRequest(new { error = result.Error });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error obteniendo lista de restaurantes activos");
+            return StatusCode(500, new { error = "Error interno del servidor" });
+        }
     }
 
     [HttpGet]
@@ -194,5 +219,43 @@ public class TenantsController : ControllerBase
                 : BadRequest(new { error = result.Error });
 
         return Ok(new { url = result.Data });
+    }
+
+    /// <summary>
+    /// Asigna un plan de suscripción a un tenant (solo SuperAdmin)
+    /// </summary>
+    [HttpPost("{tenantId:guid}/plan")]
+    public async Task<IActionResult> AssignPlan(Guid tenantId, [FromBody] AssignPlanRequest request, CancellationToken cancellationToken)
+    {
+        if (!_currentUser.IsSuperAdmin)
+            return Forbid();
+
+        var result = await _planService.AssignPlanToTenantAsync(tenantId, request.PlanId, cancellationToken);
+
+        if (!result.IsSuccess)
+            return result.Error?.Contains("no encontrad") == true
+                ? NotFound(new { error = result.Error })
+                : BadRequest(new { error = result.Error });
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Activa o desactiva un tenant (toggle entre Active e Inactive) — solo SuperAdmin
+    /// </summary>
+    [HttpPatch("{tenantId:guid}/toggle-status")]
+    public async Task<IActionResult> ToggleStatus(Guid tenantId, CancellationToken cancellationToken)
+    {
+        if (!_currentUser.IsSuperAdmin)
+            return Forbid();
+
+        var result = await _planService.ToggleTenantStatusAsync(tenantId, cancellationToken);
+
+        if (!result.IsSuccess)
+            return result.Error?.Contains("no encontrad") == true
+                ? NotFound(new { error = result.Error })
+                : BadRequest(new { error = result.Error });
+
+        return NoContent();
     }
 }

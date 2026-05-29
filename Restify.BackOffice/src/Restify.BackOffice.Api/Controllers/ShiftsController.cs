@@ -158,4 +158,42 @@ public class ShiftsController : ControllerBase
 
         return Ok(result);
     }
+
+    /// <summary>
+    /// Obtiene el turno activo del usuario autenticado en el dia de hoy.
+    /// </summary>
+    [HttpGet("my-current")]
+    public async Task<ActionResult<Result<CurrentShiftDto?>>> GetMyCurrentShift(
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _service.GetMyCurrentShiftAsync(cancellationToken);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error obteniendo turno actual del usuario");
+            return StatusCode(500, Result<CurrentShiftDto?>.Failure("Error interno del servidor"));
+        }
+    }
+
+    /// <summary>
+    /// Obtiene todos los turnos activos del branch actual (para gerentes).
+    /// </summary>
+    [HttpGet("active")]
+    public async Task<ActionResult<Result<IEnumerable<ActiveShiftDto>>>> GetActiveShifts(
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _service.GetActiveShiftsAsync(cancellationToken);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error obteniendo turnos activos");
+            return StatusCode(500, Result<IEnumerable<ActiveShiftDto>>.Failure("Error interno del servidor"));
+        }
+    }
 }

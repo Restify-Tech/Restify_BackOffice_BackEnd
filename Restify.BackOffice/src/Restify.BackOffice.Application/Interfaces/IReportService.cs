@@ -29,6 +29,16 @@ public interface IReportService
     Task<Result<FrontendDashboardSummaryDto>> GetFrontendDashboardSummaryAsync(Guid tenantId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Insights automaticos basados en datos del dia actual
+    /// </summary>
+    Task<Result<IEnumerable<InsightDto>>> GetInsightsAsync(Guid tenantId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Ranking del mesero autenticado vs sus companeros en el dia actual
+    /// </summary>
+    Task<Result<WaiterRankingDto>> GetMyRankingAsync(Guid tenantId, string currentUserIdentifier, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Exportar reporte a CSV
     /// </summary>
     Task<Result<byte[]>> ExportReportAsync(ExportReportRequestDto request, Guid tenantId, CancellationToken cancellationToken = default);

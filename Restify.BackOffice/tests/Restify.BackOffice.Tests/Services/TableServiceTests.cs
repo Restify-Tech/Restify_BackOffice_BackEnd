@@ -12,6 +12,8 @@ public class TableServiceTests
 {
     private readonly Mock<ITableRepository> _tableRepoMock;
     private readonly Mock<ICurrentUserService> _currentUserMock;
+    private readonly Mock<IOrderRepository> _orderRepoMock;
+    private readonly Mock<ICustomerRepository> _customerRepoMock;
     private readonly TableService _sut;
     private readonly Guid _tenantId = Guid.NewGuid();
 
@@ -19,9 +21,11 @@ public class TableServiceTests
     {
         _tableRepoMock = new Mock<ITableRepository>();
         _currentUserMock = new Mock<ICurrentUserService>();
+        _orderRepoMock = new Mock<IOrderRepository>();
+        _customerRepoMock = new Mock<ICustomerRepository>();
         _currentUserMock.Setup(c => c.TenantId).Returns(_tenantId);
 
-        _sut = new TableService(_tableRepoMock.Object, _currentUserMock.Object);
+        _sut = new TableService(_tableRepoMock.Object, _currentUserMock.Object, _orderRepoMock.Object, _customerRepoMock.Object);
     }
 
     #region GetByIdAsync

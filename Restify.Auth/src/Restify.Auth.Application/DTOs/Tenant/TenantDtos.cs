@@ -105,3 +105,14 @@ public record UpdateTenantDeliveryModeRequest(
     DeliveryOperationMode DeliveryOperationMode,
     Guid? DeliveryZoneId
 );
+
+/// <summary>
+/// DTO publico para seleccion de restaurante en login (sin datos sensibles)
+/// </summary>
+public record PublicTenantDto(
+    Guid Id,
+    string Name,
+    string Slug,
+    string? LogoUrl,
+    string? Address
+);

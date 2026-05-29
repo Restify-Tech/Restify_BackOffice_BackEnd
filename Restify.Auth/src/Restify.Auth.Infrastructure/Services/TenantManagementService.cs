@@ -235,6 +235,26 @@ public class TenantManagementService : ITenantManagementService
         return Result<string>.Success(url);
     }
 
+    public async Task<Result<IEnumerable<PublicTenantDto>>> GetActivePublicAsync(
+        CancellationToken cancellationToken = default)
+    {
+        // Obtener tenants activos — sin filtro de TenantId (es endpoint publico)
+        var tenants = await _context.Tenants
+            .AsNoTracking()
+            .Where(t => t.Status == Domain.Enums.TenantStatus.Active)
+            .OrderBy(t => t.Name)
+            .Select(t => new PublicTenantDto(
+                t.Id,
+                t.Name,
+                t.Slug,
+                t.LogoUrl,
+                t.Address
+            ))
+            .ToListAsync(cancellationToken);
+
+        return Result<IEnumerable<PublicTenantDto>>.Success(tenants);
+    }
+
     private static TenantDto MapToDto(Tenant tenant)
     {
         return new TenantDto(

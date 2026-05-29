@@ -11,10 +11,12 @@ namespace Restify.BackOffice.Api.Controllers;
 public class PromotionsController : ControllerBase
 {
     private readonly IPromotionService _service;
+    private readonly ILogger<PromotionsController> _logger;
 
-    public PromotionsController(IPromotionService service)
+    public PromotionsController(IPromotionService service, ILogger<PromotionsController> logger)
     {
         _service = service;
+        _logger = logger;
     }
 
     /// <summary>
@@ -80,5 +82,53 @@ public class PromotionsController : ControllerBase
             return BadRequest(new { error = result.Error });
 
         return Ok(result.Data);
+    }
+
+    /// <summary>
+    /// Calcula descuentos para una lista de items sin necesidad de crear un pedido
+    /// </summary>
+    [HttpPost("calculate")]
+    public async Task<IActionResult> Calculate([FromBody] CalculatePromotionsRequest request, CancellationToken ct)
+    {
+        try
+        {
+            var result = await _service.CalculateAsync(request, ct);
+            if (!result.IsSuccess)
+                return BadRequest(new { error = result.Error });
+
+            return Ok(result.Data);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error calculando promociones");
+            return StatusCode(500, new { error = "Error interno del servidor" });
+        }
+    }
+
+    /// <summary>
+    /// Obtiene sugerencias de upselling basadas en los productos del carrito
+    /// </summary>
+    [HttpGet("upsell")]
+    public async Task<IActionResult> GetUpsellSuggestions([FromQuery] string productIds, CancellationToken ct)
+    {
+        try
+        {
+            var ids = (productIds ?? string.Empty)
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Where(id => Guid.TryParse(id.Trim(), out _))
+                .Select(id => Guid.Parse(id.Trim()))
+                .ToList();
+
+            var result = await _service.GetUpsellSuggestionsAsync(ids, ct);
+            if (!result.IsSuccess)
+                return BadRequest(new { error = result.Error });
+
+            return Ok(result.Data);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error obteniendo sugerencias upsell");
+            return StatusCode(500, new { error = "Error interno del servidor" });
+        }
     }
 }

@@ -16,4 +16,5 @@ public interface ITenantManagementService
     Task<Result<TenantBrandingDto>> UpdateBrandingAsync(Guid id, UpdateTenantBrandingRequest request, CancellationToken cancellationToken = default);
     Task<Result<string>> UploadLogoAsync(Guid id, Stream fileStream, string fileName, CancellationToken cancellationToken = default);
     Task<Result<string>> UploadCoverImageAsync(Guid id, Stream fileStream, string fileName, CancellationToken cancellationToken = default);
+    Task<Result<IEnumerable<PublicTenantDto>>> GetActivePublicAsync(CancellationToken cancellationToken = default);
 }

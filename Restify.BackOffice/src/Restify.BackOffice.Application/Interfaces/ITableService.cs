@@ -16,4 +16,5 @@ public interface ITableService
     Task<Result<TableDto>> UpdateStatusAsync(Guid id, UpdateTableStatusRequest request, CancellationToken cancellationToken = default);
     Task<Result<bool>> DeleteAsync(Guid id, CancellationToken cancellationToken = default);
     Task<Result<TableLayoutDto>> GetLayoutAsync(CancellationToken cancellationToken = default);
+    Task<Result<TableCustomerProfileDto?>> GetCustomerProfileAsync(Guid tableId, CancellationToken cancellationToken = default);
 }

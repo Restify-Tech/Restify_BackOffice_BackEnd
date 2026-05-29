@@ -157,6 +157,117 @@ public class PromotionService : IPromotionService
         );
     }
 
+    public async Task<Result<CalculatePromotionsResponse>> CalculateAsync(
+        CalculatePromotionsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (request.Items == null || request.Items.Count == 0)
+            return Result<CalculatePromotionsResponse>.Success(
+                new CalculatePromotionsResponse(new List<AppliedPromotionDto>(), 0));
+
+        var now = DateTime.UtcNow;
+        var activePromotions = await _context.Promotions
+            .Where(p => p.IsActive)
+            .Where(p => p.ValidFrom == null || p.ValidFrom <= now)
+            .Where(p => p.ValidTo == null || p.ValidTo >= now)
+            .Where(p => p.MaxUsageCount == null || p.CurrentUsageCount < p.MaxUsageCount)
+            .ToListAsync(cancellationToken);
+
+        var cartTotal = request.Items.Sum(i => i.Quantity * i.UnitPrice);
+        var appliedPromotions = new List<AppliedPromotionDto>();
+        decimal totalDiscount = 0;
+
+        foreach (var promo in activePromotions)
+        {
+            decimal discount = 0;
+
+            // Evaluar condiciones del JSON
+            if (!string.IsNullOrEmpty(promo.ConditionsJson))
+            {
+                try
+                {
+                    var conditions = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(promo.ConditionsJson);
+
+                    if (conditions.TryGetProperty("minAmount", out var minAmountEl))
+                    {
+                        var minAmount = minAmountEl.GetDecimal();
+                        if (cartTotal < minAmount)
+                            continue;
+                    }
+
+                    if (conditions.TryGetProperty("dayOfWeek", out var dayEl) && dayEl.ValueKind == System.Text.Json.JsonValueKind.Array)
+                    {
+                        var allowedDays = dayEl.EnumerateArray().Select(d => d.GetInt32()).ToList();
+                        var today = (int)DateTime.UtcNow.DayOfWeek;
+                        if (!allowedDays.Contains(today))
+                            continue;
+                    }
+                }
+                catch
+                {
+                    // Ignorar condiciones invalidas
+                }
+            }
+
+            discount = promo.Type switch
+            {
+                PromotionType.PercentageDiscount => Math.Round(cartTotal * (promo.DiscountValue / 100), 2),
+                PromotionType.FixedDiscount => promo.DiscountValue,
+                PromotionType.HappyHour => Math.Round(cartTotal * (promo.DiscountValue / 100), 2),
+                PromotionType.BuyXGetY => promo.DiscountValue,
+                _ => promo.DiscountValue
+            };
+
+            if (discount > 0)
+            {
+                appliedPromotions.Add(new AppliedPromotionDto(
+                    promo.Id,
+                    promo.Name,
+                    promo.Type.ToString(),
+                    discount,
+                    promo.Description
+                ));
+                totalDiscount += discount;
+            }
+        }
+
+        return Result<CalculatePromotionsResponse>.Success(
+            new CalculatePromotionsResponse(appliedPromotions, Math.Round(totalDiscount, 2)));
+    }
+
+    public async Task<Result<IEnumerable<UpsellSuggestionDto>>> GetUpsellSuggestionsAsync(
+        List<Guid> productIds,
+        CancellationToken cancellationToken = default)
+    {
+        // Obtener categorias de los productos actuales en el carrito
+        var currentCategoryIds = await _context.Products
+            .Where(p => productIds.Contains(p.Id))
+            .Select(p => p.CategoryId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        // Sugerir productos activos de OTRAS categorias (complementarios)
+        var suggestions = await _context.Products
+            .Include(p => p.Category)
+            .Where(p => p.IsActive
+                     && p.IsAvailable
+                     && !productIds.Contains(p.Id)
+                     && !currentCategoryIds.Contains(p.CategoryId))
+            .OrderBy(_ => Guid.NewGuid())
+            .Take(3)
+            .Select(p => new UpsellSuggestionDto(
+                p.Id,
+                p.Name,
+                p.ImageUrl,
+                p.Price,
+                p.Category != null ? p.Category.Name : "Otros",
+                "Frecuentemente pedido junto"
+            ))
+            .ToListAsync(cancellationToken);
+
+        return Result<IEnumerable<UpsellSuggestionDto>>.Success(suggestions);
+    }
+
     private static PromotionDto MapToDto(Promotion p) => new(
         p.Id,
         p.Name,

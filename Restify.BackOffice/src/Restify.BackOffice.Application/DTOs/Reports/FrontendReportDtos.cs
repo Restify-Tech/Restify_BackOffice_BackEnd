@@ -160,6 +160,30 @@ public class FrontendDashboardSummaryDto
 }
 
 // =====================================================
+// Insights (para GET /api/reports/insights)
+// =====================================================
+
+public record InsightDto(
+    string Id,
+    string Type,          // "positive", "warning", "info"
+    string Message,
+    string? ActionLabel
+);
+
+// =====================================================
+// Waiter Ranking (para GET /api/reports/my-ranking)
+// =====================================================
+
+public record WaiterRankingDto(
+    int Position,
+    int TotalWaiters,
+    int OrdersToday,
+    decimal SalesToday,
+    string Currency,
+    string? Badge    // "top1", "top3", "top5", null
+);
+
+// =====================================================
 // Export Request (para POST /api/reports/export)
 // =====================================================
 

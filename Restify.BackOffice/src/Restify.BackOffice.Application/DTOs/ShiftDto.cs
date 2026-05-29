@@ -67,3 +67,25 @@ public record EmployeeWeekScheduleDto(
     string EmployeeName,
     IEnumerable<ShiftAssignmentDto> Days
 );
+
+// DTO para "mi turno actual" (usuario autenticado)
+public record CurrentShiftDto(
+    Guid AssignmentId,
+    DateTime Date,
+    DateTime? ClockIn,
+    DateTime? ClockOut,
+    string Status,
+    string? ShiftName,
+    string? ScheduledStart,
+    string? ScheduledEnd
+);
+
+// DTO para turno activo de un empleado (vista gerente)
+public record ActiveShiftDto(
+    Guid AssignmentId,
+    Guid EmployeeId,
+    string EmployeeName,
+    DateTime ClockIn,
+    string Status,
+    string? ShiftName
+);

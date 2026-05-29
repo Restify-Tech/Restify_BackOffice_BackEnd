@@ -1,24 +1,28 @@
 # BackOffice Service Dockerfile
+# Build context: ./BackEnd (para acceder a Restify.Core)
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-# Copy project files
-COPY ["src/Restify.BackOffice.Api/Restify.BackOffice.Api.csproj", "src/Restify.BackOffice.Api/"]
-COPY ["src/Restify.BackOffice.Application/Restify.BackOffice.Application.csproj", "src/Restify.BackOffice.Application/"]
-COPY ["src/Restify.BackOffice.Domain/Restify.BackOffice.Domain.csproj", "src/Restify.BackOffice.Domain/"]
-COPY ["src/Restify.BackOffice.Infrastructure/Restify.BackOffice.Infrastructure.csproj", "src/Restify.BackOffice.Infrastructure/"]
-COPY ["../Restify.Core/src/Restify.Core.Application/Restify.Core.Application.csproj", "src/Restify.Core.Application/"]
-COPY ["../Restify.Core/src/Restify.Core.Domain/Restify.Core.Domain.csproj", "src/Restify.Core.Domain/"]
-COPY ["../Restify.Core/src/Restify.Core.Infrastructure/Restify.Core.Infrastructure.csproj", "src/Restify.Core.Infrastructure/"]
+# Copy BackOffice project files
+COPY ["Restify.BackOffice/src/Restify.BackOffice.Api/Restify.BackOffice.Api.csproj", "Restify.BackOffice/src/Restify.BackOffice.Api/"]
+COPY ["Restify.BackOffice/src/Restify.BackOffice.Application/Restify.BackOffice.Application.csproj", "Restify.BackOffice/src/Restify.BackOffice.Application/"]
+COPY ["Restify.BackOffice/src/Restify.BackOffice.Domain/Restify.BackOffice.Domain.csproj", "Restify.BackOffice/src/Restify.BackOffice.Domain/"]
+COPY ["Restify.BackOffice/src/Restify.BackOffice.Infrastructure/Restify.BackOffice.Infrastructure.csproj", "Restify.BackOffice/src/Restify.BackOffice.Infrastructure/"]
+
+# Copy Core project files (dependencia)
+COPY ["Restify.Core/src/Restify.Core.Application/Restify.Core.Application.csproj", "Restify.Core/src/Restify.Core.Application/"]
+COPY ["Restify.Core/src/Restify.Core.Domain/Restify.Core.Domain.csproj", "Restify.Core/src/Restify.Core.Domain/"]
+COPY ["Restify.Core/src/Restify.Core.Infrastructure/Restify.Core.Infrastructure.csproj", "Restify.Core/src/Restify.Core.Infrastructure/"]
 
 # Restore dependencies
-RUN dotnet restore "src/Restify.BackOffice.Api/Restify.BackOffice.Api.csproj"
+RUN dotnet restore "Restify.BackOffice/src/Restify.BackOffice.Api/Restify.BackOffice.Api.csproj"
 
 # Copy remaining files
-COPY . .
+COPY Restify.BackOffice/ ./Restify.BackOffice/
+COPY Restify.Core/ ./Restify.Core/
 
 # Build
-WORKDIR "/src/src/Restify.BackOffice.Api"
+WORKDIR "/src/Restify.BackOffice/src/Restify.BackOffice.Api"
 RUN dotnet build "Restify.BackOffice.Api.csproj" -c Release -o /app/build
 
 # Publish

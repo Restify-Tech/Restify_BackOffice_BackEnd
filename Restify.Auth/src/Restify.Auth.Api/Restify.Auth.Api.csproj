@@ -13,6 +13,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="prometheus-net.AspNetCore" Version="8.2.1" />
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.0" />
   </ItemGroup>
@@ -20,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Restify.Auth.Infrastructure\Restify.Auth.Infrastructure.csproj" />
     <ProjectReference Include="..\Restify.Auth.Application\Restify.Auth.Application.csproj" />
+    <ProjectReference Include="..\..\..\..\..\Services\Observability\package\TakuSoft.Observability\TakuSoft.Observability.csproj" />
   </ItemGroup>
 
 </Project>
