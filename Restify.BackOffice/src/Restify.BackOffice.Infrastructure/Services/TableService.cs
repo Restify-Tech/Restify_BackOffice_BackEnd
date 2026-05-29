@@ -11,13 +11,19 @@ public class TableService : ITableService
 {
     private readonly ITableRepository _tableRepository;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IOrderRepository _orderRepository;
+    private readonly ICustomerRepository _customerRepository;
 
     public TableService(
         ITableRepository tableRepository,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IOrderRepository orderRepository,
+        ICustomerRepository customerRepository)
     {
         _tableRepository = tableRepository;
         _currentUserService = currentUserService;
+        _orderRepository = orderRepository;
+        _customerRepository = customerRepository;
     }
 
     public async Task<Result<TableDto>> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
@@ -153,5 +159,47 @@ public class TableService : ITableService
         };
 
         return Result<TableLayoutDto>.Success(layout);
+    }
+
+    public async Task<Result<TableCustomerProfileDto?>> GetCustomerProfileAsync(
+        Guid tableId,
+        CancellationToken cancellationToken = default)
+    {
+        // Verificar que la mesa existe
+        var table = await _tableRepository.GetByIdAsync(tableId, cancellationToken);
+        if (table == null)
+            return Result<TableCustomerProfileDto?>.Failure("Mesa no encontrada");
+
+        // Obtener pedidos activos en esta mesa
+        var tableOrders = await _orderRepository.GetByTableIdAsync(tableId, cancellationToken);
+        var activeOrder = tableOrders
+            .Where(o => o.Status == OrderStatus.Pending
+                     || o.Status == OrderStatus.Confirmed
+                     || o.Status == OrderStatus.Preparing
+                     || o.Status == OrderStatus.Ready)
+            .OrderByDescending(o => o.CreatedAt)
+            .FirstOrDefault();
+
+        if (activeOrder?.CustomerId is null)
+            return Result<TableCustomerProfileDto?>.Success(null);
+
+        // Obtener perfil del cliente
+        var customer = await _customerRepository.GetByIdAsync(activeOrder.CustomerId.Value, cancellationToken);
+        if (customer is null)
+            return Result<TableCustomerProfileDto?>.Success(null);
+
+        // Calcular total de pedidos del cliente en esta mesa (pedidos completados)
+        var totalOrders = tableOrders.Count(o => o.CustomerId == customer.Id
+                                              && o.Status == OrderStatus.Completed);
+
+        var dto = new TableCustomerProfileDto(
+            customer.Id,
+            customer.FullName,
+            customer.Phone,
+            customer.Email,
+            totalOrders
+        );
+
+        return Result<TableCustomerProfileDto?>.Success(dto);
     }
 }

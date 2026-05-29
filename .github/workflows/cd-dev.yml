@@ -1,0 +1,42 @@
+name: CD - Build Docker Images (Dev)
+
+on:
+  push:
+    branches: [Dev]
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build-and-push:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - service: Restify.Auth
+            image: restify-auth
+          - service: Restify.Core
+            image: restify-core
+          - service: Restify.BackOffice
+            image: restify-backoffice
+          - service: Restify.Gateway
+            image: restify-gateway
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./${{ matrix.service }}/Dockerfile
+          push: true
+          tags: ghcr.io/restify-tech/${{ matrix.image }}:dev

@@ -12,15 +12,18 @@ public class InvoiceService : IInvoiceService
     private readonly IInvoiceRepository _invoiceRepository;
     private readonly IOrderRepository _orderRepository;
     private readonly ICurrentUserService _currentUserService;
+    private readonly INotificationsService _notifications;
 
     public InvoiceService(
         IInvoiceRepository invoiceRepository,
         IOrderRepository orderRepository,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        INotificationsService notifications)
     {
         _invoiceRepository = invoiceRepository;
         _orderRepository = orderRepository;
         _currentUserService = currentUserService;
+        _notifications = notifications;
     }
 
     public async Task<Result<InvoiceDto>> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
@@ -124,7 +127,17 @@ public class InvoiceService : IInvoiceService
             await _orderRepository.UpdateAsync(order, cancellationToken);
         }
 
-        return Result<InvoiceDto>.Success(createdInvoice.ToDto());
+        var dto = createdInvoice.ToDto();
+
+        _ = _notifications.SendAsync(
+            tenantId,
+            "Factura creada",
+            $"Pedido #{order.OrderNumber} facturado — Total: {dto.Total:C}",
+            "success",
+            $"/billing/{dto.Id}",
+            cancellationToken);
+
+        return Result<InvoiceDto>.Success(dto);
     }
 
     public async Task<Result<InvoiceDto>> UpdateAsync(Guid id, UpdateInvoiceRequest request, CancellationToken cancellationToken = default)

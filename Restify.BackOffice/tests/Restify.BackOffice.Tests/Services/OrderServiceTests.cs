@@ -1,8 +1,11 @@
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Restify.BackOffice.Application.DTOs;
 using Restify.BackOffice.Application.Interfaces;
 using Restify.BackOffice.Domain.Entities;
+using Restify.BackOffice.Infrastructure.BenefitHub;
 using Restify.BackOffice.Infrastructure.Services;
 using Restify.Core.Application.Interfaces;
 
@@ -15,6 +18,8 @@ public class OrderServiceTests
     private readonly Mock<ITableRepository> _tableRepoMock;
     private readonly Mock<ICurrentUserService> _currentUserMock;
     private readonly Mock<IOrderNotificationService> _notificationMock;
+    private readonly Mock<IWebhookService> _webhookServiceMock;
+    private readonly Mock<ILogger<OrderService>> _loggerMock;
     private readonly OrderService _sut;
 
     private static readonly Guid TenantId = Guid.NewGuid();
@@ -26,16 +31,28 @@ public class OrderServiceTests
         _tableRepoMock = new Mock<ITableRepository>();
         _currentUserMock = new Mock<ICurrentUserService>();
         _notificationMock = new Mock<IOrderNotificationService>();
+        _webhookServiceMock = new Mock<IWebhookService>();
+        _loggerMock = new Mock<ILogger<OrderService>>();
 
         _currentUserMock.Setup(c => c.TenantId).Returns(TenantId);
         _currentUserMock.Setup(c => c.Email).Returns("test@demo.com");
+
+        _webhookServiceMock
+            .Setup(w => w.DispatchEventAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<object>()))
+            .Returns(Task.CompletedTask);
+
+        var configuration = new ConfigurationBuilder().Build();
 
         _sut = new OrderService(
             _orderRepoMock.Object,
             _productRepoMock.Object,
             _tableRepoMock.Object,
             _currentUserMock.Object,
-            _notificationMock.Object);
+            _notificationMock.Object,
+            new NullBenefitHubClient(),
+            configuration,
+            _webhookServiceMock.Object,
+            _loggerMock.Object);
     }
 
     #region CreateAsync

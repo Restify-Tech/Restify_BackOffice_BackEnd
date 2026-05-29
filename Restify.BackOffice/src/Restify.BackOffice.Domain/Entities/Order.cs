@@ -28,6 +28,10 @@ public class Order : TenantEntity
     public Guid? TableId { get; set; }
     public Table? Table { get; set; }
 
+    // Sucursal
+    public Guid? BranchId { get; set; }
+    public Branch? Branch { get; set; }
+
     // --- Dine-in / Mesa inteligente (Fase 1) ---
 
     /// <summary>

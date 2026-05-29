@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using Restify.BackOffice.Application.DTOs;
 using Restify.BackOffice.Application.Interfaces;
 
@@ -11,13 +12,19 @@ namespace Restify.BackOffice.Api.Controllers;
 public class CustomersController : ControllerBase
 {
     private readonly ICustomerService _service;
+    private readonly IBenefitHubClient _benefitHubClient;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<CustomersController> _logger;
 
     public CustomersController(
         ICustomerService service,
+        IBenefitHubClient benefitHubClient,
+        IConfiguration configuration,
         ILogger<CustomersController> logger)
     {
         _service = service;
+        _benefitHubClient = benefitHubClient;
+        _configuration = configuration;
         _logger = logger;
     }
 
@@ -122,6 +129,26 @@ public class CustomersController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error al eliminar cliente {CustomerId}", id);
+            return StatusCode(500, "Error interno del servidor");
+        }
+    }
+
+    /// <summary>
+    /// Obtiene los beneficios disponibles de un cliente en BenefitHub
+    /// GET /api/customers/{customerId}/benefits
+    /// </summary>
+    [HttpGet("{customerId}/benefits")]
+    public async Task<IActionResult> GetCustomerBenefits(string customerId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var tenantSourceId = _configuration["BenefitHub:TenantSourceId"] ?? "";
+            var result = await _benefitHubClient.GetCustomerBenefitsAsync(customerId, tenantSourceId);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al obtener beneficios BenefitHub para cliente {CustomerId}", customerId);
             return StatusCode(500, "Error interno del servidor");
         }
     }

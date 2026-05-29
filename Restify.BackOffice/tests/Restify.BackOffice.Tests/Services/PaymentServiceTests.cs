@@ -1,9 +1,11 @@
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Restify.BackOffice.Application.DTOs;
 using Restify.BackOffice.Application.Interfaces;
 using Restify.BackOffice.Domain.Entities;
+using Restify.BackOffice.Infrastructure.BenefitHub;
 using Restify.BackOffice.Infrastructure.Services;
 using Restify.Core.Application.Interfaces;
 
@@ -45,6 +47,8 @@ public class PaymentServiceTests
         _gatewayFactoryMock.Setup(f => f.GetGateway(It.IsAny<string>())).Returns(_gatewayMock.Object);
         _gatewayFactoryMock.Setup(f => f.GetDefaultGateway()).Returns(_gatewayMock.Object);
 
+        var configuration = new ConfigurationBuilder().Build();
+
         _sut = new PaymentService(
             _paymentRepoMock.Object,
             _orderRepoMock.Object,
@@ -52,6 +56,8 @@ public class PaymentServiceTests
             _currentUserMock.Object,
             _notificationMock.Object,
             _eventPublisherMock.Object,
+            new NullBenefitHubClient(),
+            configuration,
             _loggerMock.Object);
     }
 

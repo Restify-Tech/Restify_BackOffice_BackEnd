@@ -1,0 +1,61 @@
+name: CD Production - Backend
+
+on:
+  push:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  DOTNET_VERSION: '10.0.x'
+
+jobs:
+  build-and-push:
+    name: Build, Test & Push Docker Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - service: Restify.Auth
+            image: restify-auth
+          - service: Restify.Core
+            image: restify-core
+          - service: Restify.BackOffice
+            image: restify-backoffice
+          - service: Restify.Gateway
+            image: restify-gateway
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore ./${{ matrix.service }}/${{ matrix.service }}.sln
+
+      - name: Build
+        run: dotnet build ./${{ matrix.service }}/${{ matrix.service }}.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test ./${{ matrix.service }}/${{ matrix.service }}.sln --configuration Release --no-build --verbosity normal
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./${{ matrix.service }}/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/restify-tech/${{ matrix.image }}:latest
+            ghcr.io/restify-tech/${{ matrix.image }}:${{ github.sha }}

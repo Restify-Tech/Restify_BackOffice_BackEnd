@@ -1,6 +1,8 @@
 ---
 name: auth
 description: Especialista en el servicio Auth - JWT, usuarios, roles, permisos, tenants, registro, seguridad
+model: sonnet
+maxTurns: 30
 ---
 
 # Agente Auth — Autenticacion y Autorizacion

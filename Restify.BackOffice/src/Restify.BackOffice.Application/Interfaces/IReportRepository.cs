@@ -124,6 +124,73 @@ public interface IReportRepository
     /// </summary>
     Task<(int pending, int inProgress, int ready)> GetOrderStatusCountsAsync(Guid tenantId, CancellationToken cancellationToken = default);
     
+    // ========== AGGREGATED QUERIES (Frontend) ==========
+
+    /// <summary>
+    /// Obtiene ventas diarias con desglose de impuestos y descuentos
+    /// </summary>
+    Task<List<(DateTime date, decimal subtotal, decimal tax, decimal discount, decimal total, int invoiceCount, int orderCount)>> GetDailySalesDetailedAsync(
+        DateTime from,
+        DateTime to,
+        Guid tenantId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Obtiene totales de impuestos y descuentos en un periodo
+    /// </summary>
+    Task<(decimal totalTax, decimal totalDiscount)> GetTaxAndDiscountTotalsAsync(
+        DateTime from,
+        DateTime to,
+        Guid tenantId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Obtiene ventas agrupadas por dia de la semana
+    /// </summary>
+    Task<List<(int dayOfWeek, int invoiceCount, decimal totalSales)>> GetSalesByDayOfWeekAsync(
+        DateTime from,
+        DateTime to,
+        Guid tenantId,
+        CancellationToken cancellationToken = default);
+
+    // ========== INSIGHTS / RANKING QUERIES ==========
+
+    /// <summary>
+    /// Obtiene ventas totales del día actual (usando Orders completadas)
+    /// </summary>
+    Task<(decimal todaySales, int todayOrders)> GetTodayOrderTotalsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Obtiene ventas totales de ayer (usando Orders completadas)
+    /// </summary>
+    Task<(decimal yesterdaySales, int yesterdayOrders)> GetYesterdayOrderTotalsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Obtiene cantidad de pedidos activos con más de X minutos sin cerrar
+    /// </summary>
+    Task<int> GetLongRunningOrdersCountAsync(
+        Guid tenantId,
+        int thresholdMinutes,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Obtiene el producto más pedido hoy (por cantidad de items)
+    /// </summary>
+    Task<(string productName, int quantity)?> GetTopProductTodayAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Obtiene el ranking de todos los meseros del día agrupados por TakenBy
+    /// </summary>
+    Task<List<(string takenBy, int orders, decimal sales)>> GetWaiterRankingTodayAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken = default);
+
     // ========== CONTROL QUERIES ==========
     
     /// <summary>

@@ -56,10 +56,18 @@ public class TableConfiguration : IEntityTypeConfiguration<Table>
 
         builder.Property(t => t.UpdatedAt);
 
+        // Relacion con sucursal
+        builder.HasOne(t => t.Branch)
+            .WithMany(b => b.Tables)
+            .HasForeignKey(t => t.BranchId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.SetNull);
+
         // Índices
         builder.HasIndex(t => t.TenantId);
         builder.HasIndex(t => new { t.TenantId, t.Number }).IsUnique();
         builder.HasIndex(t => new { t.TenantId, t.Status });
         builder.HasIndex(t => new { t.TenantId, t.Zone });
+        builder.HasIndex(t => t.BranchId);
     }
 }

@@ -72,6 +72,70 @@ namespace Restify.Auth.Infrastructure.Persistence.Migrations
                     b.ToTable("DeliveryZones");
                 });
 
+            modelBuilder.Entity("Restify.Auth.Domain.Entities.GeneralValue", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEditable")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<Guid?>("ParentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Value")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("ValueType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Category");
+
+                    b.HasIndex("Key")
+                        .IsUnique();
+
+                    b.HasIndex("ParentId");
+
+                    b.ToTable("general_values", (string)null);
+                });
+
             modelBuilder.Entity("Restify.Auth.Domain.Entities.Permission", b =>
                 {
                     b.Property<Guid>("Id")
@@ -116,6 +180,89 @@ namespace Restify.Auth.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("Permissions", (string)null);
+                });
+
+            modelBuilder.Entity("Restify.Auth.Domain.Entities.Plan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("AnnualPrice")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<string>("Color")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("MaxBranches")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MaxUsers")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("MonthlyPrice")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Plans", (string)null);
+                });
+
+            modelBuilder.Entity("Restify.Auth.Domain.Entities.PlanScreenPermission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsIncluded")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("PlanId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ScreenCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PlanId", "ScreenCode")
+                        .IsUnique();
+
+                    b.ToTable("PlanScreenPermissions", (string)null);
                 });
 
             modelBuilder.Entity("Restify.Auth.Domain.Entities.Role", b =>
@@ -251,6 +398,13 @@ namespace Restify.Auth.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AccentColor")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("#F59E0B");
+
                     b.Property<string>("Address")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
@@ -258,6 +412,10 @@ namespace Restify.Auth.Infrastructure.Persistence.Migrations
                     b.Property<string>("BusinessName")
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
+
+                    b.Property<string>("CoverImageUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -272,6 +430,10 @@ namespace Restify.Auth.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(3)")
                         .HasDefaultValue("USD");
 
+                    b.Property<string>("CustomCss")
+                        .HasMaxLength(5000)
+                        .HasColumnType("character varying(5000)");
+
                     b.Property<int>("DeliveryOperationMode")
                         .HasColumnType("integer");
 
@@ -281,6 +443,18 @@ namespace Restify.Auth.Infrastructure.Persistence.Migrations
                     b.Property<string>("Email")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<string>("FaviconUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("FontBody")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("FontHeading")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("FullAddress")
                         .HasColumnType("text");
@@ -312,6 +486,9 @@ namespace Restify.Auth.Infrastructure.Persistence.Migrations
                     b.Property<string>("Phone")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<Guid?>("PlanId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("PrimaryColor")
                         .IsRequired()
@@ -348,6 +525,13 @@ namespace Restify.Auth.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(5,2)")
                         .HasDefaultValue(15.00m);
 
+                    b.Property<string>("TemplateName")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("elegante");
+
                     b.Property<string>("TimeZone")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -367,6 +551,8 @@ namespace Restify.Auth.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("DeliveryZoneId");
+
+                    b.HasIndex("PlanId");
 
                     b.HasIndex("Slug")
                         .IsUnique();
@@ -456,10 +642,18 @@ namespace Restify.Auth.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("UpdatedBy")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Username")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("TenantId", "Email")
                         .IsUnique();
+
+                    b.HasIndex("TenantId", "Username")
+                        .IsUnique()
+                        .HasFilter("\"Username\" IS NOT NULL");
 
                     b.ToTable("Users", (string)null);
                 });
@@ -490,6 +684,27 @@ namespace Restify.Auth.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("UserRoles", (string)null);
+                });
+
+            modelBuilder.Entity("Restify.Auth.Domain.Entities.GeneralValue", b =>
+                {
+                    b.HasOne("Restify.Auth.Domain.Entities.GeneralValue", "Parent")
+                        .WithMany("Children")
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Parent");
+                });
+
+            modelBuilder.Entity("Restify.Auth.Domain.Entities.PlanScreenPermission", b =>
+                {
+                    b.HasOne("Restify.Auth.Domain.Entities.Plan", "Plan")
+                        .WithMany("PlanScreenPermissions")
+                        .HasForeignKey("PlanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Plan");
                 });
 
             modelBuilder.Entity("Restify.Auth.Domain.Entities.Role", b =>
@@ -528,7 +743,14 @@ namespace Restify.Auth.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("DeliveryZoneId");
 
+                    b.HasOne("Restify.Auth.Domain.Entities.Plan", "Plan")
+                        .WithMany("Tenants")
+                        .HasForeignKey("PlanId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("DeliveryZone");
+
+                    b.Navigation("Plan");
                 });
 
             modelBuilder.Entity("Restify.Auth.Domain.Entities.User", b =>
@@ -561,9 +783,21 @@ namespace Restify.Auth.Infrastructure.Persistence.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Restify.Auth.Domain.Entities.GeneralValue", b =>
+                {
+                    b.Navigation("Children");
+                });
+
             modelBuilder.Entity("Restify.Auth.Domain.Entities.Permission", b =>
                 {
                     b.Navigation("RolePermissions");
+                });
+
+            modelBuilder.Entity("Restify.Auth.Domain.Entities.Plan", b =>
+                {
+                    b.Navigation("PlanScreenPermissions");
+
+                    b.Navigation("Tenants");
                 });
 
             modelBuilder.Entity("Restify.Auth.Domain.Entities.Role", b =>

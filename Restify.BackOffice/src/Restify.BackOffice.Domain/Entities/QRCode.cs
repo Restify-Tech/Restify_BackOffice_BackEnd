@@ -15,6 +15,10 @@ public class QRCode : TenantEntity
     public bool IsActive { get; set; } = true;
     public DateTime? LastScannedAt { get; set; }
     public int ScanCount { get; set; } = 0;
+
+    // Sucursal
+    public Guid? BranchId { get; set; }
+    public Branch? Branch { get; set; }
 }
 
 /// <summary>

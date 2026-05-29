@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Restify.Auth.Application.DTOs.Common;
+using Restify.Auth.Application.DTOs.Plans;
 using Restify.Auth.Application.DTOs.Tenant;
 using Restify.Auth.Application.Interfaces;
 
@@ -12,12 +14,35 @@ namespace Restify.Auth.Api.Controllers;
 public class TenantsController : ControllerBase
 {
     private readonly ITenantManagementService _service;
+    private readonly IPlanService _planService;
     private readonly ICurrentUserService _currentUser;
+    private readonly ILogger<TenantsController> _logger;
 
-    public TenantsController(ITenantManagementService service, ICurrentUserService currentUser)
+    public TenantsController(ITenantManagementService service, IPlanService planService, ICurrentUserService currentUser, ILogger<TenantsController> logger)
     {
         _service = service;
+        _planService = planService;
         _currentUser = currentUser;
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Obtiene la lista de restaurantes activos (endpoint publico para seleccion en login).
+    /// </summary>
+    [HttpGet("active")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetActiveTenants(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _service.GetActivePublicAsync(cancellationToken);
+            return result.IsSuccess ? Ok(result.Data) : BadRequest(new { error = result.Error });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error obteniendo lista de restaurantes activos");
+            return StatusCode(500, new { error = "Error interno del servidor" });
+        }
     }
 
     [HttpGet]
@@ -87,6 +112,144 @@ public class TenantsController : ControllerBase
             return Forbid();
 
         var result = await _service.UpdateDeliveryModeAsync(id, request, cancellationToken);
+
+        if (!result.IsSuccess)
+            return result.Error?.Contains("no encontrad") == true
+                ? NotFound(new { error = result.Error })
+                : BadRequest(new { error = result.Error });
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Obtener branding publico por RUC o cedula (para login 2 pasos)
+    /// </summary>
+    [AllowAnonymous]
+    [HttpGet("branding/by-identification/{identificationNumber}")]
+    public async Task<IActionResult> GetBrandingByIdentification(string identificationNumber, CancellationToken cancellationToken)
+    {
+        var result = await _service.GetBrandingByIdentificationAsync(identificationNumber, cancellationToken);
+
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
+
+        return Ok(result.Data);
+    }
+
+    /// <summary>
+    /// Obtener branding publico por slug (para menu QR)
+    /// </summary>
+    [AllowAnonymous]
+    [HttpGet("branding/{slug}")]
+    public async Task<IActionResult> GetBrandingBySlug(string slug, CancellationToken cancellationToken)
+    {
+        var result = await _service.GetBrandingBySlugAsync(slug, cancellationToken);
+
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
+
+        return Ok(result.Data);
+    }
+
+    /// <summary>
+    /// Obtener branding del tenant por ID (admin)
+    /// </summary>
+    [HttpGet("{id:guid}/branding")]
+    public async Task<IActionResult> GetBrandingById(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _service.GetBrandingByIdAsync(id, cancellationToken);
+
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
+
+        return Ok(result.Data);
+    }
+
+    /// <summary>
+    /// Actualizar branding del tenant
+    /// </summary>
+    [HttpPut("{id:guid}/branding")]
+    public async Task<IActionResult> UpdateBranding(Guid id, [FromBody] UpdateTenantBrandingRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _service.UpdateBrandingAsync(id, request, cancellationToken);
+
+        if (!result.IsSuccess)
+            return result.Error?.Contains("no encontrad") == true
+                ? NotFound(new { error = result.Error })
+                : BadRequest(new { error = result.Error });
+
+        return Ok(result.Data);
+    }
+
+    /// <summary>
+    /// Subir logo del tenant
+    /// </summary>
+    [HttpPost("{id:guid}/logo")]
+    public async Task<IActionResult> UploadLogo(Guid id, IFormFile file, CancellationToken cancellationToken)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest(new { error = "Debe seleccionar un archivo" });
+
+        using var stream = file.OpenReadStream();
+        var result = await _service.UploadLogoAsync(id, stream, file.FileName, cancellationToken);
+
+        if (!result.IsSuccess)
+            return result.Error?.Contains("no encontrad") == true
+                ? NotFound(new { error = result.Error })
+                : BadRequest(new { error = result.Error });
+
+        return Ok(new { url = result.Data });
+    }
+
+    /// <summary>
+    /// Subir imagen de portada del tenant
+    /// </summary>
+    [HttpPost("{id:guid}/cover-image")]
+    public async Task<IActionResult> UploadCoverImage(Guid id, IFormFile file, CancellationToken cancellationToken)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest(new { error = "Debe seleccionar un archivo" });
+
+        using var stream = file.OpenReadStream();
+        var result = await _service.UploadCoverImageAsync(id, stream, file.FileName, cancellationToken);
+
+        if (!result.IsSuccess)
+            return result.Error?.Contains("no encontrad") == true
+                ? NotFound(new { error = result.Error })
+                : BadRequest(new { error = result.Error });
+
+        return Ok(new { url = result.Data });
+    }
+
+    /// <summary>
+    /// Asigna un plan de suscripción a un tenant (solo SuperAdmin)
+    /// </summary>
+    [HttpPost("{tenantId:guid}/plan")]
+    public async Task<IActionResult> AssignPlan(Guid tenantId, [FromBody] AssignPlanRequest request, CancellationToken cancellationToken)
+    {
+        if (!_currentUser.IsSuperAdmin)
+            return Forbid();
+
+        var result = await _planService.AssignPlanToTenantAsync(tenantId, request.PlanId, cancellationToken);
+
+        if (!result.IsSuccess)
+            return result.Error?.Contains("no encontrad") == true
+                ? NotFound(new { error = result.Error })
+                : BadRequest(new { error = result.Error });
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Activa o desactiva un tenant (toggle entre Active e Inactive) — solo SuperAdmin
+    /// </summary>
+    [HttpPatch("{tenantId:guid}/toggle-status")]
+    public async Task<IActionResult> ToggleStatus(Guid tenantId, CancellationToken cancellationToken)
+    {
+        if (!_currentUser.IsSuperAdmin)
+            return Forbid();
+
+        var result = await _planService.ToggleTenantStatusAsync(tenantId, cancellationToken);
 
         if (!result.IsSuccess)
             return result.Error?.Contains("no encontrad") == true

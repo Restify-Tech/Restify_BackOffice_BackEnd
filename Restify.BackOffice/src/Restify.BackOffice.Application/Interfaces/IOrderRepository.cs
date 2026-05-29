@@ -1,4 +1,6 @@
+using Restify.BackOffice.Application.DTOs;
 using Restify.BackOffice.Domain.Entities;
+using Restify.Core.Application.DTOs.Common;
 
 namespace Restify.BackOffice.Application.Interfaces;
 
@@ -14,4 +16,7 @@ public interface IOrderRepository
     Task<Order> UpdateAsync(Order order, CancellationToken cancellationToken = default);
     Task DeleteAsync(Guid id, CancellationToken cancellationToken = default);
     Task<string> GenerateOrderNumberAsync(CancellationToken cancellationToken = default);
+    Task<(IEnumerable<Order> Items, int TotalCount)> GetPagedAsync(GetOrdersQuery query, CancellationToken cancellationToken = default);
+    Task<OrderStatisticsDto> GetStatisticsAsync(DateTime? from, DateTime? to, CancellationToken cancellationToken = default);
+    Task<OrderTodayStatsDto> GetTodayStatsAsync(CancellationToken cancellationToken = default);
 }

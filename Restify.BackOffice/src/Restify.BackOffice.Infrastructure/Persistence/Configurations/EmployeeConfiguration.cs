@@ -76,9 +76,17 @@ public class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
 
         builder.Property(e => e.UpdatedAt);
 
+        // Relacion con sucursal
+        builder.HasOne(e => e.Branch)
+            .WithMany(b => b.Employees)
+            .HasForeignKey(e => e.BranchId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.SetNull);
+
         // Indices
         builder.HasIndex(e => e.TenantId);
         builder.HasIndex(e => new { e.TenantId, e.IdentificationNumber }).IsUnique();
         builder.HasIndex(e => new { e.TenantId, e.Email }).IsUnique();
+        builder.HasIndex(e => e.BranchId);
     }
 }

@@ -8,6 +8,7 @@ namespace Restify.Auth.Application.DTOs.Users;
 public record UserDto(
     Guid Id,
     string Email,
+    string? Username,
     string FirstName,
     string LastName,
     string? Phone,

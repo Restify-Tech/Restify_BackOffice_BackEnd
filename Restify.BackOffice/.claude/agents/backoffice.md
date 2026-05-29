@@ -1,6 +1,8 @@
 ---
 name: backoffice
 description: Especialista en el servicio BackOffice - menu, pedidos, mesas, facturacion, inventario, delivery, empleados
+model: sonnet
+maxTurns: 30
 ---
 
 # Agente BackOffice — Operacion del Restaurante

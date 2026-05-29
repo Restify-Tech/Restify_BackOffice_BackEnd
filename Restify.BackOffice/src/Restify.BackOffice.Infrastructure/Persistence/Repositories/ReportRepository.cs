@@ -311,6 +311,77 @@ public class ReportRepository : IReportRepository
         )).ToList();
     }
 
+    // ========== AGGREGATED QUERIES (Frontend) ==========
+
+    public async Task<List<(DateTime date, decimal subtotal, decimal tax, decimal discount, decimal total, int invoiceCount, int orderCount)>> GetDailySalesDetailedAsync(
+        DateTime from,
+        DateTime to,
+        Guid tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _context.Invoices
+            .Where(i => i.TenantId == tenantId
+                && i.Status == InvoiceStatus.Paid
+                && i.CreatedAt.Date >= from.Date
+                && i.CreatedAt.Date <= to.Date)
+            .GroupBy(i => i.CreatedAt.Date)
+            .Select(g => new
+            {
+                Date = g.Key,
+                Subtotal = g.Sum(i => i.Subtotal),
+                Tax = g.Sum(i => i.Tax),
+                Discount = g.Sum(i => i.DiscountAmount),
+                Total = g.Sum(i => i.Total),
+                InvoiceCount = g.Count(),
+                OrderCount = g.Select(i => i.OrderId).Distinct().Count()
+            })
+            .OrderBy(x => x.Date)
+            .ToListAsync(cancellationToken);
+
+        return result.Select(r => (r.Date, r.Subtotal, r.Tax, r.Discount, r.Total, r.InvoiceCount, r.OrderCount)).ToList();
+    }
+
+    public async Task<(decimal totalTax, decimal totalDiscount)> GetTaxAndDiscountTotalsAsync(
+        DateTime from,
+        DateTime to,
+        Guid tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _context.Invoices
+            .Where(i => i.TenantId == tenantId
+                && i.Status == InvoiceStatus.Paid
+                && i.CreatedAt.Date >= from.Date
+                && i.CreatedAt.Date <= to.Date);
+
+        var totalTax = await query.SumAsync(i => i.Tax, cancellationToken);
+        var totalDiscount = await query.SumAsync(i => i.DiscountAmount, cancellationToken);
+
+        return (totalTax, totalDiscount);
+    }
+
+    public async Task<List<(int dayOfWeek, int invoiceCount, decimal totalSales)>> GetSalesByDayOfWeekAsync(
+        DateTime from,
+        DateTime to,
+        Guid tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _context.Invoices
+            .Where(i => i.TenantId == tenantId
+                && i.Status == InvoiceStatus.Paid
+                && i.CreatedAt.Date >= from.Date
+                && i.CreatedAt.Date <= to.Date)
+            .GroupBy(i => (int)i.CreatedAt.DayOfWeek)
+            .Select(g => new
+            {
+                DayOfWeek = g.Key,
+                InvoiceCount = g.Count(),
+                TotalSales = g.Sum(i => i.Total)
+            })
+            .ToListAsync(cancellationToken);
+
+        return result.Select(r => (r.DayOfWeek, r.InvoiceCount, r.TotalSales)).ToList();
+    }
+
     // ========== EMPLOYEE QUERIES ==========
 
     public async Task<List<(
@@ -442,6 +513,103 @@ public class ReportRepository : IReportRepository
             .CountAsync(cancellationToken);
 
         return (pending, inProgress, ready);
+    }
+
+    // ========== INSIGHTS / RANKING QUERIES ==========
+
+    public async Task<(decimal todaySales, int todayOrders)> GetTodayOrderTotalsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        var today = DateTime.UtcNow.Date;
+
+        var result = await _context.Orders
+            .Where(o => o.TenantId == tenantId
+                && o.CreatedAt.Date == today
+                && (o.Status == OrderStatus.Completed || o.Status == OrderStatus.Served))
+            .GroupBy(_ => 1)
+            .Select(g => new { Sales = g.Sum(o => o.Total), Orders = g.Count() })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return (result?.Sales ?? 0m, result?.Orders ?? 0);
+    }
+
+    public async Task<(decimal yesterdaySales, int yesterdayOrders)> GetYesterdayOrderTotalsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        var yesterday = DateTime.UtcNow.Date.AddDays(-1);
+
+        var result = await _context.Orders
+            .Where(o => o.TenantId == tenantId
+                && o.CreatedAt.Date == yesterday
+                && (o.Status == OrderStatus.Completed || o.Status == OrderStatus.Served))
+            .GroupBy(_ => 1)
+            .Select(g => new { Sales = g.Sum(o => o.Total), Orders = g.Count() })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return (result?.Sales ?? 0m, result?.Orders ?? 0);
+    }
+
+    public async Task<int> GetLongRunningOrdersCountAsync(
+        Guid tenantId,
+        int thresholdMinutes,
+        CancellationToken cancellationToken = default)
+    {
+        var today = DateTime.UtcNow.Date;
+        var cutoff = DateTime.UtcNow.AddMinutes(-thresholdMinutes);
+
+        return await _context.Orders
+            .Where(o => o.TenantId == tenantId
+                && o.CreatedAt.Date == today
+                && o.Status != OrderStatus.Completed
+                && o.Status != OrderStatus.Served
+                && o.Status != OrderStatus.Cancelled
+                && o.CreatedAt < cutoff)
+            .CountAsync(cancellationToken);
+    }
+
+    public async Task<(string productName, int quantity)?> GetTopProductTodayAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        var today = DateTime.UtcNow.Date;
+
+        var top = await _context.OrderItems
+            .Where(i => i.TenantId == tenantId && i.Order.CreatedAt.Date == today)
+            .GroupBy(i => i.Product.Name)
+            .Select(g => new { Name = g.Key, Quantity = g.Sum(i => i.Quantity) })
+            .OrderByDescending(x => x.Quantity)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (top is null)
+            return null;
+
+        return (top.Name, top.Quantity);
+    }
+
+    public async Task<List<(string takenBy, int orders, decimal sales)>> GetWaiterRankingTodayAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        var today = DateTime.UtcNow.Date;
+
+        var result = await _context.Orders
+            .Where(o => o.TenantId == tenantId
+                && o.CreatedAt.Date == today
+                && !string.IsNullOrEmpty(o.TakenBy)
+                && (o.Status == OrderStatus.Completed || o.Status == OrderStatus.Served))
+            .GroupBy(o => o.TakenBy!)
+            .Select(g => new
+            {
+                TakenBy = g.Key,
+                Orders = g.Count(),
+                Sales = g.Sum(o => o.Total)
+            })
+            .OrderByDescending(x => x.Sales)
+            .ToListAsync(cancellationToken);
+
+        return result.Select(r => (r.TakenBy, r.Orders, r.Sales)).ToList();
     }
 
     // ========== CONTROL QUERIES ==========

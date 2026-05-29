@@ -56,7 +56,7 @@ public class DataProviderController : ControllerBase
     /// Ejecuta una consulta sobre una entidad (GET con query params)
     /// </summary>
     [HttpGet("{entityName}/query")]
-    [AllowAnonymous] // TODO: Remove in production
+    [Authorize]
     public async Task<IActionResult> Query(
         string entityName,
         [FromQuery] string viewName = "default",

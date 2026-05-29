@@ -18,6 +18,7 @@ public static class TestDbContextFactory
         dbName ??= Guid.NewGuid().ToString();
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseInMemoryDatabase(dbName)
+            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning))
             .Options;
 
         return new AppDbContext(options);
@@ -31,6 +32,7 @@ public static class TestDbContextFactory
         dbName ??= Guid.NewGuid().ToString();
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseInMemoryDatabase(dbName)
+            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning))
             .Options;
 
         var currentUserMock = new Mock<ICurrentUserService>();

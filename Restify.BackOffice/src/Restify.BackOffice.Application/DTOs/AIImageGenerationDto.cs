@@ -21,4 +21,5 @@ public class GenerateImageRequest
     public Guid ProductId { get; set; }
     public Guid? PromptTemplateId { get; set; }
     public string? CustomPrompt { get; set; }
+    public string? ReferenceImageUrl { get; set; }
 }

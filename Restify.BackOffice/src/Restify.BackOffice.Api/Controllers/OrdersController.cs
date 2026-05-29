@@ -225,6 +225,115 @@ public class OrdersController : ControllerBase
     }
 
     /// <summary>
+    /// Obtiene pedidos paginados con filtros
+    /// </summary>
+    [HttpGet("paged")]
+    public async Task<IActionResult> GetPaged([FromQuery] GetOrdersQuery query, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _orderService.GetPagedAsync(query, cancellationToken);
+            return result.IsSuccess ? Ok(result.Data) : BadRequest(result.Error);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al obtener pedidos paginados");
+            return StatusCode(500, "Error interno del servidor");
+        }
+    }
+
+    /// <summary>
+    /// Estadísticas de pedidos por rango de fechas
+    /// </summary>
+    [HttpGet("statistics")]
+    public async Task<IActionResult> GetStatistics(
+        [FromQuery] DateTime? from, [FromQuery] DateTime? to, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _orderService.GetStatisticsAsync(from, to, cancellationToken);
+            return result.IsSuccess ? Ok(result.Data) : BadRequest(result.Error);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al obtener estadísticas de pedidos");
+            return StatusCode(500, "Error interno del servidor");
+        }
+    }
+
+    /// <summary>
+    /// Estadísticas de pedidos del día actual
+    /// </summary>
+    [HttpGet("today-stats")]
+    public async Task<IActionResult> GetTodayStats(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _orderService.GetTodayStatsAsync(cancellationToken);
+            return result.IsSuccess ? Ok(result.Data) : BadRequest(result.Error);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al obtener estadísticas del día");
+            return StatusCode(500, "Error interno del servidor");
+        }
+    }
+
+    /// <summary>
+    /// Agrega un item a un pedido existente
+    /// </summary>
+    [HttpPost("{id}/items")]
+    public async Task<IActionResult> AddItem(Guid id, [FromBody] CreateOrderItemRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _orderService.AddItemAsync(id, request, cancellationToken);
+            return result.IsSuccess ? Ok(result.Data) : BadRequest(result.Error);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al agregar item al pedido {OrderId}", id);
+            return StatusCode(500, "Error interno del servidor");
+        }
+    }
+
+    /// <summary>
+    /// Modifica un item de un pedido
+    /// </summary>
+    [HttpPut("{id}/items/{itemId}")]
+    public async Task<IActionResult> UpdateItem(Guid id, Guid itemId, [FromBody] UpdateOrderItemRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _orderService.UpdateItemAsync(id, itemId, request, cancellationToken);
+            return result.IsSuccess ? Ok(result.Data) : BadRequest(result.Error);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al modificar item {ItemId} del pedido {OrderId}", itemId, id);
+            return StatusCode(500, "Error interno del servidor");
+        }
+    }
+
+    /// <summary>
+    /// Elimina un item de un pedido
+    /// </summary>
+    [HttpDelete("{id}/items/{itemId}")]
+    public async Task<IActionResult> RemoveItem(Guid id, Guid itemId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _orderService.RemoveItemAsync(id, itemId, cancellationToken);
+            return result.IsSuccess ? NoContent() : BadRequest(result.Error);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al eliminar item {ItemId} del pedido {OrderId}", itemId, id);
+            return StatusCode(500, "Error interno del servidor");
+        }
+    }
+
+    /// <summary>
     /// Elimina un pedido
     /// </summary>
     [HttpDelete("{id}")]
