@@ -13,6 +13,7 @@ public class InvoiceServiceTests
     private readonly Mock<IInvoiceRepository> _invoiceRepoMock;
     private readonly Mock<IOrderRepository> _orderRepoMock;
     private readonly Mock<ICurrentUserService> _currentUserMock;
+    private readonly Mock<INotificationsService> _notificationsMock;
     private readonly InvoiceService _sut;
 
     private static readonly Guid TenantId = Guid.NewGuid();
@@ -22,6 +23,7 @@ public class InvoiceServiceTests
         _invoiceRepoMock = new Mock<IInvoiceRepository>();
         _orderRepoMock = new Mock<IOrderRepository>();
         _currentUserMock = new Mock<ICurrentUserService>();
+        _notificationsMock = new Mock<INotificationsService>();
 
         _currentUserMock.Setup(c => c.TenantId).Returns(TenantId);
         _currentUserMock.Setup(c => c.Email).Returns("admin@demo.com");
@@ -29,7 +31,8 @@ public class InvoiceServiceTests
         _sut = new InvoiceService(
             _invoiceRepoMock.Object,
             _orderRepoMock.Object,
-            _currentUserMock.Object);
+            _currentUserMock.Object,
+            _notificationsMock.Object);
     }
 
     #region GetByIdAsync

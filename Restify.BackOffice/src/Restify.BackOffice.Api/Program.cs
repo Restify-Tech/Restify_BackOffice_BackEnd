@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Prometheus;
 using Microsoft.IdentityModel.Tokens;
 using Restify.BackOffice.Api.Hubs;
 using Restify.BackOffice.Api.Services;
@@ -8,7 +9,9 @@ using Restify.BackOffice.Application.Interfaces;
 using Restify.BackOffice.Domain.Entities;
 using Restify.BackOffice.Infrastructure.Extensions;
 using Restify.BackOffice.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Restify.Core.Application.Interfaces;
+using TakuSoft.Observability.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,15 +19,20 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddBackOfficeApplication();
 builder.Services.AddBackOfficeInfrastructure(builder.Configuration);
 
+// TakuSoft Observability
+builder.Services.AddTakuObservability(builder.Configuration);
+
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddControllers();
 
 // Agregar seeder
 builder.Services.AddScoped<BackOfficeDbSeeder>();
 
-// JWT Authentication
+// Validar JWT SecretKey al iniciar
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey not configured");
+var secretKey = jwtSettings["SecretKey"];
+if (string.IsNullOrEmpty(secretKey) || secretKey.Length < 32)
+    throw new InvalidOperationException("JwtSettings:SecretKey debe tener al menos 32 caracteres. Proveer via variable de entorno JwtSettings__SecretKey");
 
 builder.Services.AddAuthentication(options =>
 {
@@ -68,22 +76,21 @@ builder.Services.AddAuthorization();
 // SignalR
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IOrderNotificationService, OrderNotificationService>();
+builder.Services.AddScoped<INotificationsService, NotificationsService>();
 
 // Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// CORS
+// Configurar CORS con whitelist desde configuracion
 builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowAll", policy =>
-    {
-        policy.SetIsOriginAllowed(_ => true)
-              .AllowAnyMethod()
+    options.AddDefaultPolicy(policy =>
+        policy.WithOrigins(
+            builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+                ?? ["http://localhost:3000"])
               .AllowAnyHeader()
-              .AllowCredentials();
-    });
-});
+              .AllowAnyMethod()
+              .AllowCredentials()));
 
 var app = builder.Build();
 
@@ -94,6 +101,13 @@ entityRegistry.Register<Category, BackOfficeDbContext>("Category");
 // entityRegistry.Register<Product, BackOfficeDbContext>("Product");
 // entityRegistry.Register<Table, BackOfficeDbContext>("Table");
 
+// Auto-migrate database
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<BackOfficeDbContext>();
+    await db.Database.MigrateAsync();
+}
+
 // Ejecutar seeder en desarrollo
 if (app.Environment.IsDevelopment())
 {
@@ -102,20 +116,29 @@ if (app.Environment.IsDevelopment())
     await seeder.SeedAsync();
 }
 
-// Configure pipeline
-app.UseSwagger();
-app.UseSwaggerUI(c =>
+// Swagger solo en Development/Staging
+if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Staging"))
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Restify BackOffice API v1");
-    c.RoutePrefix = string.Empty;
-});
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Restify BackOffice API v1");
+        c.RoutePrefix = string.Empty;
+    });
+}
 
-app.UseCors("AllowAll");
+app.UseCorrelationId();
+app.UseGlobalExceptionHandler();
+app.UseAuditMiddleware();
+app.UseCors();
+app.UseHttpMetrics();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapMetrics();
 app.MapHub<OrderHub>("/hubs/orders");
 app.MapHub<DeliveryTrackingHub>("/hubs/delivery-tracking");
+app.MapHub<NotificationsHub>("/hubs/notifications");
 
 // Health Check endpoint
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "backoffice", timestamp = DateTime.UtcNow }));
