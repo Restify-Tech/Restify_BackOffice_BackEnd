@@ -288,12 +288,131 @@ public class OrderService : IOrderService
         if (order == null)
             return Result<bool>.Failure("Pedido no encontrado");
 
-        // Solo permitir eliminar pedidos pendientes
         if (order.Status != OrderStatus.Pending)
             return Result<bool>.Failure("Solo se pueden eliminar pedidos pendientes");
 
         await _orderRepository.DeleteAsync(id, cancellationToken);
+        return Result<bool>.Success(true);
+    }
 
+    public async Task<Result<PagedResponse<OrderDto>>> GetPagedAsync(
+        GetOrdersQuery query, CancellationToken cancellationToken = default)
+    {
+        var (items, total) = await _orderRepository.GetPagedAsync(query, cancellationToken);
+        return Result<PagedResponse<OrderDto>>.Success(new PagedResponse<OrderDto>
+        {
+            Items      = items.Select(o => o.ToDto()).ToList(),
+            Page       = query.Page,
+            PageSize   = query.PageSize,
+            TotalCount = total
+        });
+    }
+
+    public async Task<Result<OrderStatisticsDto>> GetStatisticsAsync(
+        DateTime? from, DateTime? to, CancellationToken cancellationToken = default)
+    {
+        var stats = await _orderRepository.GetStatisticsAsync(from, to, cancellationToken);
+        return Result<OrderStatisticsDto>.Success(stats);
+    }
+
+    public async Task<Result<OrderTodayStatsDto>> GetTodayStatsAsync(CancellationToken cancellationToken = default)
+    {
+        var stats = await _orderRepository.GetTodayStatsAsync(cancellationToken);
+        return Result<OrderTodayStatsDto>.Success(stats);
+    }
+
+    public async Task<Result<OrderDto>> AddItemAsync(
+        Guid orderId, CreateOrderItemRequest request, CancellationToken cancellationToken = default)
+    {
+        var order = await _orderRepository.GetByIdAsync(orderId, cancellationToken);
+        if (order == null)
+            return Result<OrderDto>.Failure("Pedido no encontrado");
+
+        if (order.Status is OrderStatus.Completed or OrderStatus.Cancelled)
+            return Result<OrderDto>.Failure("No se pueden agregar items a un pedido completado o cancelado");
+
+        var product = await _productRepository.GetByIdAsync(request.ProductId, cancellationToken);
+        if (product == null)
+            return Result<OrderDto>.Failure("Producto no encontrado");
+
+        if (!product.IsAvailable)
+            return Result<OrderDto>.Failure($"Producto no disponible: {product.Name}");
+
+        var tenantId = _currentUserService.TenantId ?? Guid.Empty;
+        var item = new OrderItem
+        {
+            Id        = Guid.NewGuid(),
+            TenantId  = tenantId,
+            OrderId   = order.Id,
+            ProductId = product.Id,
+            Product   = product,
+            Quantity  = request.Quantity,
+            UnitPrice = product.Price,
+            Subtotal  = product.Price * request.Quantity,
+            Notes     = request.Notes,
+            Status    = OrderItemStatus.Pending
+        };
+
+        ((List<OrderItem>)order.Items).Add(item);
+        order.Subtotal = order.Items.Sum(i => i.Subtotal);
+        order.Total    = order.Subtotal + order.Tax - order.Discount;
+
+        await _orderRepository.UpdateAsync(order, cancellationToken);
+        return Result<OrderDto>.Success(order.ToDto());
+    }
+
+    public async Task<Result<OrderDto>> UpdateItemAsync(
+        Guid orderId, Guid itemId, UpdateOrderItemRequest request, CancellationToken cancellationToken = default)
+    {
+        var order = await _orderRepository.GetByIdAsync(orderId, cancellationToken);
+        if (order == null)
+            return Result<OrderDto>.Failure("Pedido no encontrado");
+
+        if (order.Status is OrderStatus.Completed or OrderStatus.Cancelled)
+            return Result<OrderDto>.Failure("No se pueden modificar items de un pedido completado o cancelado");
+
+        var item = order.Items.FirstOrDefault(i => i.Id == itemId);
+        if (item == null)
+            return Result<OrderDto>.Failure("Item no encontrado en el pedido");
+
+        if (request.Quantity.HasValue)
+        {
+            item.Quantity = request.Quantity.Value;
+            item.Subtotal = item.UnitPrice * request.Quantity.Value;
+        }
+
+        if (request.Notes != null)
+            item.Notes = request.Notes;
+
+        order.Subtotal = order.Items.Sum(i => i.Subtotal);
+        order.Total    = order.Subtotal + order.Tax - order.Discount;
+
+        await _orderRepository.UpdateAsync(order, cancellationToken);
+        return Result<OrderDto>.Success(order.ToDto());
+    }
+
+    public async Task<Result<bool>> RemoveItemAsync(
+        Guid orderId, Guid itemId, CancellationToken cancellationToken = default)
+    {
+        var order = await _orderRepository.GetByIdAsync(orderId, cancellationToken);
+        if (order == null)
+            return Result<bool>.Failure("Pedido no encontrado");
+
+        if (order.Status is OrderStatus.Completed or OrderStatus.Cancelled)
+            return Result<bool>.Failure("No se pueden eliminar items de un pedido completado o cancelado");
+
+        var item = order.Items.FirstOrDefault(i => i.Id == itemId);
+        if (item == null)
+            return Result<bool>.Failure("Item no encontrado en el pedido");
+
+        if (order.Items.Count == 1)
+            return Result<bool>.Failure("No se puede eliminar el único item del pedido");
+
+        ((List<OrderItem>)order.Items).Remove(item);
+        order.Subtotal = order.Items.Sum(i => i.Subtotal);
+        order.Total    = order.Subtotal + order.Tax - order.Discount;
+
+        await _orderRepository.UpdateAsync(order, cancellationToken);
         return Result<bool>.Success(true);
     }
 }

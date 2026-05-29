@@ -70,3 +70,42 @@ public class UpdateOrderItemStatusRequestValidator : AbstractValidator<UpdateOrd
             .IsInEnum().WithMessage("El estado del item no es válido");
     }
 }
+
+public class UpdateOrderItemRequestValidator : AbstractValidator<UpdateOrderItemRequest>
+{
+    public UpdateOrderItemRequestValidator()
+    {
+        RuleFor(x => x.Quantity)
+            .GreaterThan(0).WithMessage("La cantidad debe ser mayor a 0")
+            .When(x => x.Quantity.HasValue);
+
+        RuleFor(x => x.Notes)
+            .MaximumLength(500).WithMessage("Las notas no pueden exceder 500 caracteres")
+            .When(x => x.Notes != null);
+    }
+}
+
+public class GetOrdersQueryValidator : AbstractValidator<GetOrdersQuery>
+{
+    public GetOrdersQueryValidator()
+    {
+        RuleFor(x => x.Page)
+            .GreaterThanOrEqualTo(1).WithMessage("La página debe ser mayor o igual a 1");
+
+        RuleFor(x => x.PageSize)
+            .InclusiveBetween(1, 100).WithMessage("El tamaño de página debe estar entre 1 y 100");
+
+        RuleFor(x => x.Status)
+            .IsInEnum().WithMessage("El estado no es válido")
+            .When(x => x.Status.HasValue);
+
+        RuleFor(x => x.OrderType)
+            .IsInEnum().WithMessage("El tipo de orden no es válido")
+            .When(x => x.OrderType.HasValue);
+
+        RuleFor(x => x.DateFrom)
+            .LessThanOrEqualTo(x => x.DateTo)
+            .WithMessage("La fecha de inicio no puede ser mayor a la fecha de fin")
+            .When(x => x.DateFrom.HasValue && x.DateTo.HasValue);
+    }
+}

@@ -83,3 +83,47 @@ public class UpdateOrderItemStatusRequest
 {
     public OrderItemStatus Status { get; set; }
 }
+
+public class UpdateOrderItemRequest
+{
+    public int? Quantity { get; set; }
+    public string? Notes { get; set; }
+}
+
+public class GetOrdersQuery : Restify.Core.Application.DTOs.Common.PagedRequest
+{
+    public OrderStatus? Status { get; set; }
+    public OrderType? OrderType { get; set; }
+    public DateTime? DateFrom { get; set; }
+    public DateTime? DateTo { get; set; }
+}
+
+public class OrderStatisticsDto
+{
+    public int TotalOrders { get; set; }
+    public int PendingOrders { get; set; }
+    public int PreparingOrders { get; set; }
+    public int ReadyOrders { get; set; }
+    public int CompletedOrders { get; set; }
+    public int CancelledOrders { get; set; }
+    public decimal TotalRevenue { get; set; }
+    public decimal AverageOrderValue { get; set; }
+    public Dictionary<string, int> OrdersByType { get; set; } = new();
+}
+
+public class OrderTodayStatsDto
+{
+    public int TodayOrders { get; set; }
+    public int ActiveOrders { get; set; }
+    public decimal TodayRevenue { get; set; }
+    public decimal TodayAverageTicket { get; set; }
+    public int CompletedToday { get; set; }
+    public int CancelledToday { get; set; }
+    public List<HourlyOrderCountDto> OrdersByHour { get; set; } = new();
+}
+
+public class HourlyOrderCountDto
+{
+    public int Hour { get; set; }
+    public int Count { get; set; }
+}
