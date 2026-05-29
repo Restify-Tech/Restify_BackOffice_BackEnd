@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Restify.BackOffice.Application.DTOs;
 using Restify.BackOffice.Application.Interfaces;
 using Restify.BackOffice.Application.Mappings;
@@ -15,19 +17,31 @@ public class OrderService : IOrderService
     private readonly ITableRepository _tableRepository;
     private readonly ICurrentUserService _currentUserService;
     private readonly IOrderNotificationService _notificationService;
+    private readonly IBenefitHubClient _benefitHubClient;
+    private readonly IConfiguration _configuration;
+    private readonly IWebhookService _webhookService;
+    private readonly ILogger<OrderService> _logger;
 
     public OrderService(
         IOrderRepository orderRepository,
         IProductRepository productRepository,
         ITableRepository tableRepository,
         ICurrentUserService currentUserService,
-        IOrderNotificationService notificationService)
+        IOrderNotificationService notificationService,
+        IBenefitHubClient benefitHubClient,
+        IConfiguration configuration,
+        IWebhookService webhookService,
+        ILogger<OrderService> logger)
     {
         _orderRepository = orderRepository;
         _productRepository = productRepository;
         _tableRepository = tableRepository;
         _currentUserService = currentUserService;
         _notificationService = notificationService;
+        _benefitHubClient = benefitHubClient;
+        _configuration = configuration;
+        _webhookService = webhookService;
+        _logger = logger;
     }
 
     public async Task<Result<OrderDto>> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
@@ -143,6 +157,14 @@ public class OrderService : IOrderService
         // Notify real-time clients
         await _notificationService.NotifyOrderCreatedAsync(tenantId, dto, cancellationToken);
 
+        // Dispatch webhook event — fire and forget
+        await _webhookService.DispatchEventAsync(tenantId.ToString(), "order.created", new
+        {
+            orderId = dto.Id,
+            orderNumber = dto.OrderNumber,
+            total = dto.Total
+        });
+
         return Result<OrderDto>.Success(dto);
     }
 
@@ -172,12 +194,49 @@ public class OrderService : IOrderService
             }
         }
 
+        // BenefitHub: revertir beneficios si el pedido estaba pagado y se cancela (no critico)
+        if (request.Status == OrderStatus.Cancelled && order.PaymentStatus == PaymentStatus.Paid)
+        {
+            try
+            {
+                await _benefitHubClient.ReverseAsync(
+                    order.Id.ToString(),
+                    _configuration["BenefitHub:TenantSourceId"] ?? "",
+                    "Pedido cancelado");
+
+                _logger.LogInformation(
+                    "BenefitHub: beneficios revertidos para pedido cancelado {OrderNumber}", order.OrderNumber);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "BenefitHub reverse fallo para pedido {OrderNumber}", order.OrderNumber);
+            }
+        }
+
         var updated = await _orderRepository.UpdateAsync(order, cancellationToken);
         var dto = updated.ToDto();
 
         // Notify real-time clients
         var tenantId = _currentUserService.TenantId ?? Guid.Empty;
         await _notificationService.NotifyOrderStatusChangedAsync(tenantId, dto, cancellationToken);
+
+        // Dispatch webhook events — fire and forget
+        if (request.Status == OrderStatus.Completed)
+        {
+            await _webhookService.DispatchEventAsync(tenantId.ToString(), "order.completed", new
+            {
+                orderId = dto.Id,
+                orderNumber = dto.OrderNumber,
+                total = dto.Total
+            });
+        }
+        else if (request.Status == OrderStatus.Ready)
+        {
+            await _webhookService.DispatchEventAsync(tenantId.ToString(), "order.ready", new
+            {
+                orderId = dto.Id
+            });
+        }
 
         return Result<OrderDto>.Success(dto);
     }
@@ -212,6 +271,12 @@ public class OrderService : IOrderService
         if (order.Status == OrderStatus.Ready)
         {
             await _notificationService.NotifyOrderStatusChangedAsync(tenantId, dto, cancellationToken);
+
+            // Dispatch webhook event — fire and forget
+            await _webhookService.DispatchEventAsync(tenantId.ToString(), "order.ready", new
+            {
+                orderId = dto.Id
+            });
         }
 
         return Result<OrderDto>.Success(dto);
@@ -223,12 +288,131 @@ public class OrderService : IOrderService
         if (order == null)
             return Result<bool>.Failure("Pedido no encontrado");
 
-        // Solo permitir eliminar pedidos pendientes
         if (order.Status != OrderStatus.Pending)
             return Result<bool>.Failure("Solo se pueden eliminar pedidos pendientes");
 
         await _orderRepository.DeleteAsync(id, cancellationToken);
+        return Result<bool>.Success(true);
+    }
 
+    public async Task<Result<PagedResponse<OrderDto>>> GetPagedAsync(
+        GetOrdersQuery query, CancellationToken cancellationToken = default)
+    {
+        var (items, total) = await _orderRepository.GetPagedAsync(query, cancellationToken);
+        return Result<PagedResponse<OrderDto>>.Success(new PagedResponse<OrderDto>
+        {
+            Items      = items.Select(o => o.ToDto()).ToList(),
+            Page       = query.Page,
+            PageSize   = query.PageSize,
+            TotalCount = total
+        });
+    }
+
+    public async Task<Result<OrderStatisticsDto>> GetStatisticsAsync(
+        DateTime? from, DateTime? to, CancellationToken cancellationToken = default)
+    {
+        var stats = await _orderRepository.GetStatisticsAsync(from, to, cancellationToken);
+        return Result<OrderStatisticsDto>.Success(stats);
+    }
+
+    public async Task<Result<OrderTodayStatsDto>> GetTodayStatsAsync(CancellationToken cancellationToken = default)
+    {
+        var stats = await _orderRepository.GetTodayStatsAsync(cancellationToken);
+        return Result<OrderTodayStatsDto>.Success(stats);
+    }
+
+    public async Task<Result<OrderDto>> AddItemAsync(
+        Guid orderId, CreateOrderItemRequest request, CancellationToken cancellationToken = default)
+    {
+        var order = await _orderRepository.GetByIdAsync(orderId, cancellationToken);
+        if (order == null)
+            return Result<OrderDto>.Failure("Pedido no encontrado");
+
+        if (order.Status is OrderStatus.Completed or OrderStatus.Cancelled)
+            return Result<OrderDto>.Failure("No se pueden agregar items a un pedido completado o cancelado");
+
+        var product = await _productRepository.GetByIdAsync(request.ProductId, cancellationToken);
+        if (product == null)
+            return Result<OrderDto>.Failure("Producto no encontrado");
+
+        if (!product.IsAvailable)
+            return Result<OrderDto>.Failure($"Producto no disponible: {product.Name}");
+
+        var tenantId = _currentUserService.TenantId ?? Guid.Empty;
+        var item = new OrderItem
+        {
+            Id        = Guid.NewGuid(),
+            TenantId  = tenantId,
+            OrderId   = order.Id,
+            ProductId = product.Id,
+            Product   = product,
+            Quantity  = request.Quantity,
+            UnitPrice = product.Price,
+            Subtotal  = product.Price * request.Quantity,
+            Notes     = request.Notes,
+            Status    = OrderItemStatus.Pending
+        };
+
+        ((List<OrderItem>)order.Items).Add(item);
+        order.Subtotal = order.Items.Sum(i => i.Subtotal);
+        order.Total    = order.Subtotal + order.Tax - order.Discount;
+
+        await _orderRepository.UpdateAsync(order, cancellationToken);
+        return Result<OrderDto>.Success(order.ToDto());
+    }
+
+    public async Task<Result<OrderDto>> UpdateItemAsync(
+        Guid orderId, Guid itemId, UpdateOrderItemRequest request, CancellationToken cancellationToken = default)
+    {
+        var order = await _orderRepository.GetByIdAsync(orderId, cancellationToken);
+        if (order == null)
+            return Result<OrderDto>.Failure("Pedido no encontrado");
+
+        if (order.Status is OrderStatus.Completed or OrderStatus.Cancelled)
+            return Result<OrderDto>.Failure("No se pueden modificar items de un pedido completado o cancelado");
+
+        var item = order.Items.FirstOrDefault(i => i.Id == itemId);
+        if (item == null)
+            return Result<OrderDto>.Failure("Item no encontrado en el pedido");
+
+        if (request.Quantity.HasValue)
+        {
+            item.Quantity = request.Quantity.Value;
+            item.Subtotal = item.UnitPrice * request.Quantity.Value;
+        }
+
+        if (request.Notes != null)
+            item.Notes = request.Notes;
+
+        order.Subtotal = order.Items.Sum(i => i.Subtotal);
+        order.Total    = order.Subtotal + order.Tax - order.Discount;
+
+        await _orderRepository.UpdateAsync(order, cancellationToken);
+        return Result<OrderDto>.Success(order.ToDto());
+    }
+
+    public async Task<Result<bool>> RemoveItemAsync(
+        Guid orderId, Guid itemId, CancellationToken cancellationToken = default)
+    {
+        var order = await _orderRepository.GetByIdAsync(orderId, cancellationToken);
+        if (order == null)
+            return Result<bool>.Failure("Pedido no encontrado");
+
+        if (order.Status is OrderStatus.Completed or OrderStatus.Cancelled)
+            return Result<bool>.Failure("No se pueden eliminar items de un pedido completado o cancelado");
+
+        var item = order.Items.FirstOrDefault(i => i.Id == itemId);
+        if (item == null)
+            return Result<bool>.Failure("Item no encontrado en el pedido");
+
+        if (order.Items.Count == 1)
+            return Result<bool>.Failure("No se puede eliminar el único item del pedido");
+
+        ((List<OrderItem>)order.Items).Remove(item);
+        order.Subtotal = order.Items.Sum(i => i.Subtotal);
+        order.Total    = order.Subtotal + order.Tax - order.Discount;
+
+        await _orderRepository.UpdateAsync(order, cancellationToken);
         return Result<bool>.Success(true);
     }
 }

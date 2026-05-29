@@ -313,4 +313,26 @@ public class TablesController : ControllerBase
             return StatusCode(500, "Error interno del servidor");
         }
     }
+
+    /// <summary>
+    /// Obtiene el perfil del cliente asociado al pedido activo en una mesa
+    /// </summary>
+    [HttpGet("{id}/customer-profile")]
+    public async Task<IActionResult> GetCustomerProfile(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _tableService.GetCustomerProfileAsync(id, cancellationToken);
+
+            if (!result.IsSuccess)
+                return BadRequest(result.Error);
+
+            return Ok(result.Data);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al obtener perfil del cliente para mesa {TableId}", id);
+            return StatusCode(500, "Error interno del servidor");
+        }
+    }
 }

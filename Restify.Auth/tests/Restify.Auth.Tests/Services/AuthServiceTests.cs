@@ -127,7 +127,7 @@ public class AuthServiceTests : IDisposable
     public async Task Login_ConCredencialesValidas_RetornaExitoConTokens()
     {
         // Arrange
-        var request = new LoginRequest("admin@test.com", "Admin123!", "test-restaurant");
+        var request = new LoginRequest("admin@test.com", null, "Admin123!", "test-restaurant");
 
         // Act
         var result = await _authService.LoginAsync(request);
@@ -147,7 +147,7 @@ public class AuthServiceTests : IDisposable
     public async Task Login_ConEmailInexistente_RetornaFallo()
     {
         // Arrange
-        var request = new LoginRequest("noexiste@test.com", "Admin123!", "test-restaurant");
+        var request = new LoginRequest("noexiste@test.com", null, "Admin123!", "test-restaurant");
 
         // Act
         var result = await _authService.LoginAsync(request);
@@ -161,7 +161,7 @@ public class AuthServiceTests : IDisposable
     public async Task Login_ConPasswordIncorrecto_RetornaFallo()
     {
         // Arrange
-        var request = new LoginRequest("admin@test.com", "WrongPassword!", "test-restaurant");
+        var request = new LoginRequest("admin@test.com", null, "WrongPassword!", "test-restaurant");
 
         // Act
         var result = await _authService.LoginAsync(request);
@@ -175,7 +175,7 @@ public class AuthServiceTests : IDisposable
     public async Task Login_ConUsuarioInactivo_RetornaFallo()
     {
         // Arrange
-        var request = new LoginRequest("inactive@test.com", "Admin123!", "test-restaurant");
+        var request = new LoginRequest("inactive@test.com", null, "Admin123!", "test-restaurant");
 
         // Act
         var result = await _authService.LoginAsync(request);
@@ -189,7 +189,7 @@ public class AuthServiceTests : IDisposable
     public async Task Login_ConTenantInexistente_RetornaFallo()
     {
         // Arrange
-        var request = new LoginRequest("admin@test.com", "Admin123!", "slug-no-existe");
+        var request = new LoginRequest("admin@test.com", null, "Admin123!", "slug-no-existe");
 
         // Act
         var result = await _authService.LoginAsync(request);
@@ -204,7 +204,7 @@ public class AuthServiceTests : IDisposable
     {
         // Arrange: primero hacer login para obtener tokens
         var loginResult = await _authService.LoginAsync(
-            new LoginRequest("admin@test.com", "Admin123!", "test-restaurant"));
+            new LoginRequest("admin@test.com", null, "Admin123!", "test-restaurant"));
         loginResult.IsSuccess.Should().BeTrue();
 
         var refreshRequest = new RefreshTokenRequest(
@@ -228,7 +228,7 @@ public class AuthServiceTests : IDisposable
     {
         // Arrange: primero hacer login
         var loginResult = await _authService.LoginAsync(
-            new LoginRequest("admin@test.com", "Admin123!", "test-restaurant"));
+            new LoginRequest("admin@test.com", null, "Admin123!", "test-restaurant"));
         loginResult.IsSuccess.Should().BeTrue();
 
         var refreshRequest = new RefreshTokenRequest(
@@ -248,7 +248,7 @@ public class AuthServiceTests : IDisposable
     {
         // Arrange: hacer login y luego expirar manualmente el refresh token
         var loginResult = await _authService.LoginAsync(
-            new LoginRequest("admin@test.com", "Admin123!", "test-restaurant"));
+            new LoginRequest("admin@test.com", null, "Admin123!", "test-restaurant"));
         loginResult.IsSuccess.Should().BeTrue();
 
         var user = _context.Users.IgnoreQueryFilters().First(u => u.Id == _adminUserId);
@@ -272,7 +272,7 @@ public class AuthServiceTests : IDisposable
     {
         // Arrange: hacer login primero
         var loginResult = await _authService.LoginAsync(
-            new LoginRequest("admin@test.com", "Admin123!", "test-restaurant"));
+            new LoginRequest("admin@test.com", null, "Admin123!", "test-restaurant"));
         loginResult.IsSuccess.Should().BeTrue();
 
         var user = _context.Users.IgnoreQueryFilters().First(u => u.Id == _adminUserId);
@@ -396,7 +396,7 @@ public class AuthServiceTests : IDisposable
     public async Task Login_SinTenantSlug_BuscaEnTodos()
     {
         // Arrange: login sin especificar tenant slug
-        var request = new LoginRequest("admin@test.com", "Admin123!");
+        var request = new LoginRequest("admin@test.com", null, "Admin123!");
 
         // Act
         var result = await _authService.LoginAsync(request);

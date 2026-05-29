@@ -86,6 +86,12 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
             .HasForeignKey(o => o.TableId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(o => o.Branch)
+            .WithMany()
+            .HasForeignKey(o => o.BranchId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.HasOne(o => o.Customer)
             .WithMany(c => c.Orders)
             .HasForeignKey(o => o.CustomerId)
@@ -103,6 +109,7 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.HasIndex(o => o.TableId);
         builder.HasIndex(o => o.CustomerId);
         builder.HasIndex(o => o.CreatedAt);
+        builder.HasIndex(o => o.BranchId);
     }
 }
 

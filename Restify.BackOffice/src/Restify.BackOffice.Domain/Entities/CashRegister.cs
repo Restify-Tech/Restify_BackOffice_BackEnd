@@ -38,6 +38,10 @@ public class CashRegister : TenantEntity
     /// Todas las sesiones de esta caja
     /// </summary>
     public ICollection<CashRegisterSession> Sessions { get; set; } = new List<CashRegisterSession>();
+
+    // Sucursal
+    public Guid? BranchId { get; set; }
+    public Branch? Branch { get; set; }
 }
 
 /// <summary>
@@ -105,6 +109,11 @@ public class CashRegisterSession : TenantEntity
     /// Movimientos de esta sesión
     /// </summary>
     public ICollection<CashRegisterMovement> Movements { get; set; } = new List<CashRegisterMovement>();
+
+    /// <summary>
+    /// Cierres formales de esta sesión
+    /// </summary>
+    public ICollection<CashClosing> Closings { get; set; } = new List<CashClosing>();
     
     // Propiedades calculadas (no mapeadas a BD)
     

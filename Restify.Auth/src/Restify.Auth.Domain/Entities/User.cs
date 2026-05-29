@@ -20,6 +20,11 @@ public class User : AuditableEntity, ITenantEntity
     public string Email { get; set; } = string.Empty;
 
     /// <summary>
+    /// Nombre de usuario alternativo (único por tenant, opcional)
+    /// </summary>
+    public string? Username { get; set; }
+
+    /// <summary>
     /// Hash de la contraseña
     /// </summary>
     public string PasswordHash { get; set; } = string.Empty;

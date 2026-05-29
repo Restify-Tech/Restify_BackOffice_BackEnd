@@ -58,7 +58,8 @@ public class AIImageController : ControllerBase
             {
                 ProductId = productId,
                 PromptTemplateId = request?.PromptTemplateId,
-                CustomPrompt = request?.CustomPrompt
+                CustomPrompt = request?.CustomPrompt,
+                ReferenceImageUrl = request?.ReferenceImageUrl
             };
 
             var result = await _aiImageService.GenerateImageAsync(generateRequest, cancellationToken);
@@ -241,4 +242,5 @@ public class GenerateImageForProductRequest
 {
     public Guid? PromptTemplateId { get; set; }
     public string? CustomPrompt { get; set; }
+    public string? ReferenceImageUrl { get; set; }
 }

@@ -58,6 +58,10 @@ public static class ServiceCollectionExtensions
         // Registrar Repository genérico
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 
+        // Registrar GeneralValues
+        services.AddScoped<IGeneralValueRepository, GeneralValueRepository>();
+        services.AddScoped<IGeneralValueService, GeneralValueService>();
+
         // Configurar JWT
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
 
@@ -80,6 +84,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITenantRegistrationService, TenantRegistrationService>();
         services.AddScoped<ITenantOnboardingService, TenantOnboardingService>();
         services.AddScoped<IFileStorageService, LocalFileStorageService>();
+
+        // Registrar repositorio y servicio de planes
+        services.AddScoped<IPlanRepository, PlanRepository>();
+        services.AddScoped<IPlanService, PlanService>();
 
         return services;
     }

@@ -69,6 +69,32 @@ public class TenantConfiguration : IEntityTypeConfiguration<Tenant>
             .IsRequired()
             .HasConversion<int>();
 
+        // Branding fields
+        builder.Property(t => t.FaviconUrl)
+            .HasMaxLength(500);
+
+        builder.Property(t => t.AccentColor)
+            .IsRequired()
+            .HasMaxLength(10)
+            .HasDefaultValue("#F59E0B");
+
+        builder.Property(t => t.TemplateName)
+            .IsRequired()
+            .HasMaxLength(50)
+            .HasDefaultValue("elegante");
+
+        builder.Property(t => t.CustomCss)
+            .HasMaxLength(5000);
+
+        builder.Property(t => t.CoverImageUrl)
+            .HasMaxLength(500);
+
+        builder.Property(t => t.FontHeading)
+            .HasMaxLength(100);
+
+        builder.Property(t => t.FontBody)
+            .HasMaxLength(100);
+
         // Relaciones
         builder.HasMany(t => t.Users)
             .WithOne(u => u.Tenant)

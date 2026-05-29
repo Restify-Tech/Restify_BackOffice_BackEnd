@@ -36,6 +36,10 @@ public class TenantRegistrationService : ITenantRegistrationService
         TenantRegisterRequest request,
         CancellationToken cancellationToken = default)
     {
+        // Validar contraseña mínima (defensa en profundidad)
+        if (string.IsNullOrWhiteSpace(request.AdminPassword) || request.AdminPassword.Length < 8)
+            return Result<TenantRegisterResponse>.Failure("La contraseña debe tener al menos 8 caracteres.");
+
         // Verificar unicidad del slug
         var slugExists = await _context.Tenants
             .AnyAsync(t => t.Slug == request.Slug, cancellationToken);

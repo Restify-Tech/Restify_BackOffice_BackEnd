@@ -39,10 +39,18 @@ public class CashRegisterConfiguration : IEntityTypeConfiguration<CashRegister>
             .HasForeignKey(s => s.CashRegisterId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Relacion con sucursal
+        builder.HasOne(cr => cr.Branch)
+            .WithMany(b => b.CashRegisters)
+            .HasForeignKey(cr => cr.BranchId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.SetNull);
+
         // Índices
         builder.HasIndex(cr => cr.TenantId);
         builder.HasIndex(cr => cr.Name);
         builder.HasIndex(cr => cr.Status);
+        builder.HasIndex(cr => cr.BranchId);
     }
 }
 

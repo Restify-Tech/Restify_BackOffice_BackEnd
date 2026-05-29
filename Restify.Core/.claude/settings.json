@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash(git status)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git branch*)",
+      "Bash(git checkout*)",
+      "Bash(git push*)",
+      "Bash(\"/mnt/c/Program Files/dotnet/dotnet.exe\" build*)",
+      "Bash(\"/mnt/c/Program Files/dotnet/dotnet.exe\" test*)",
+      "Bash(\"/mnt/c/Program Files/dotnet/dotnet.exe\" run*)",
+      "Bash(\"/mnt/c/Program Files/dotnet/dotnet.exe\" ef*)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(git push --force*)",
+      "Bash(git reset --hard*)"
+    ]
+  }
+}

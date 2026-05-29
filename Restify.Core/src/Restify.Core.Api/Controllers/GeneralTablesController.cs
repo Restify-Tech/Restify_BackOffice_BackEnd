@@ -7,7 +7,7 @@ namespace Restify.Core.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[AllowAnonymous] // Temporal mientras se configura auth
+[Authorize]
 public class GeneralTablesController : ControllerBase
 {
     private readonly IGeneralTableService _service;

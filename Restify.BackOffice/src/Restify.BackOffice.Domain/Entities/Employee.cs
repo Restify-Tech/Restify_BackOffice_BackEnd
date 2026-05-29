@@ -26,6 +26,10 @@ public class Employee : TenantEntity
     public string? SocialSecurityNumber { get; set; }
     public bool IsActive { get; set; } = true;
 
+    // Sucursal
+    public Guid? BranchId { get; set; }
+    public Branch? Branch { get; set; }
+
     // Navegacion
     public ICollection<PayrollEntry> PayrollEntries { get; set; } = new List<PayrollEntry>();
 }

@@ -8,7 +8,7 @@ namespace Restify.BackOffice.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[AllowAnonymous] // TODO: Revertir a [Authorize] después de pruebas
+[Authorize]
 public class CategoriesController : ControllerBase
 {
     private readonly ICategoryService _service;
